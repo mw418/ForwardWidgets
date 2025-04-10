@@ -57,17 +57,17 @@ var WidgetMetadata = {
     const videoIds = [];
     let data = response.data["items"][0]["video"][0]
     for (const item of data.data) {
-        let title = item.display_name
+        title = item.display_name
+        url = "https://www.themoviedb.org/search/trending?query=" + encodeURIComponent(title)
         const res = await Widget.http.get(url, {
             headers: {
-              Referer: "https://www.themoviedb.org/search/trending?query=" + encodeURIComponent(title),
               "User-Agent":
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
                 "Host": "www.themoviedb.org",
             },
           });
         console.log(res.data);
-        let id = res.data.results[0].id
+        id = res.data.results[0].id
         videoIds.push({
             id: id,
             type: "tmdb",
