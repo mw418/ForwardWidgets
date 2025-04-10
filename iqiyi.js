@@ -35,7 +35,7 @@ var WidgetMetadata = {
 
 
 
-async function loadCardItems() {
+async function loadhot() {
     url = "https://mesh.if.iqiyi.com/portal/lw/v7/channel/card/videoTab?device_id=34eba1cd42f6eea4c8cd1c23b86c2887&v=13.034.21571&channelName=recommend&data_source=v7_hotspot_marketing_data%2Cv7_hotspot_data&count=1%2C14&block_id=hot_recommend&device=34eba1cd42f6eea4c8cd1c23b86c2887"
     const response = await Widget.http.get(url, {
       headers: {
