@@ -1,0 +1,16 @@
+{
+  "title": "Iqiyi Widgets",
+  "description": "A collection of widgets created by mw418",
+  "icon": "https://github.com/pack1r/ForwardWidgets/raw/main/icon.png",
+  "widgets": [
+    {
+      "id": "iqiyi",
+      "title": "爱奇艺",
+      "description": "爱奇艺热播",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.0",
+      "author": "mw418",
+      "url": "https://raw.githubusercontent.com/mw418/ForwardWidgets/refs/heads/master/iqiyi.js"
+    }
+  ]
+}
