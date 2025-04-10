@@ -67,13 +67,22 @@ var WidgetMetadata = {
             },
           });
         console.log(res.data);
-        if (res.data.results.length !== 0){
-            id = res.data.results[0].id
-            type = 'tmdb'
+        let id = null; // 初始化id为null
+        let type = null; // 初始化type为null
+        if (res.data.results.length !== 0) {
+            for (const i of res.data.results) {
+                if (i.original_name === title) {
+                    id = i.id;
+                    type = 'tmdb';
+                    break; // 找到匹配项后退出循环
+                }
+            }
         }
-        else{
-            id = item.play_url
-            type = 'url'
+        
+        // 检查id是否仍然为初始值
+        if (id === null) {
+            id = item.play_url;
+            type = 'url';
         }
         videoIds.push({
             id: id,
