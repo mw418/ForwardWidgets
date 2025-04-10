@@ -66,6 +66,7 @@ var WidgetMetadata = {
                 "Host": "www.themoviedb.org",
             },
           });
+        console.log(res.data);
         let id = res.data.results[0].id
         videoIds.push({
             id: id,
