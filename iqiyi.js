@@ -12,15 +12,25 @@ var WidgetMetadata = {
             description: "Description", // 模块描述
             requiresWebView: false,    // 是否需要 WebView
             functionName: "loadhot", // 处理函数名
-            sectionMode: false,        // 是否支持分段模式
+            sectionMode: false,
+            params: [
+                {
+                  name: "url",
+                  title: "列表地址",
+                  type: "input",
+                  description: "IMDB 片单地址",
+                  placeholders: [
+                    {
+                      title: "IMDb Top 250 Movies",
+                      value: "https://www.imdb.com/chart/top/?ref_=nv_mv_250",
+                    },
+                    {
+                      title: "IMDb Top 250 TV",
+                      value: "https://www.imdb.com/chart/toptv/?ref_=nv_tvv_250",
+                    },
+                  ],      // 是否支持分段模式
         }
-    ],
-    search: {                   // 搜索功能配置（可选）
-        title: "Search",
-        requiresWebView: false,
-        functionName: "search",
-        params: [/* 搜索参数配置 */]
-    }
+    ]
 };
 
 
