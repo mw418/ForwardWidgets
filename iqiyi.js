@@ -67,10 +67,17 @@ var WidgetMetadata = {
             },
           });
         console.log(res.data);
-        id = res.data.results[0].id
+        if (res.data.results){
+            id = res.data.results[0].id
+            type = 'tmdb'
+        }
+        else{
+            id = item.play_url
+            type = 'url'
+        }
         videoIds.push({
             id: id,
-            type: "tmdb",
+            type: type,
             title: title,
             description: item.description,
             coverUrl: item.image_cover,
