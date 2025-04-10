@@ -67,7 +67,7 @@ var WidgetMetadata = {
             },
           });
         console.log(res.data);
-        if (res.data.results.length === 0){
+        if (res.data.results.length !== 0){
             id = res.data.results[0].id
             type = 'tmdb'
         }
