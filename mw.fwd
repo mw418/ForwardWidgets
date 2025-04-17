@@ -1,7 +1,7 @@
 {
   "title": "Iqiyi Widgets",
   "description": "A collection of widgets created by mw418",
-  "icon": "https://github.com/pack1r/ForwardWidgets/raw/main/icon.png",
+  "icon": "https://github.com/mw418/ForwardWidgets/raw/master/icon.png",
   "widgets": [
     {
       "id": "iqiyi",
