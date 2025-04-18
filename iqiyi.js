@@ -25,9 +25,6 @@ async function loadhot() {
     headers: {
       Referer: "https://mesh.if.iqiyi.com/",
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-      "Accept": "*/*",
-      "Host": "mesh.if.iqiyi.com",
-      "Connection": "keep-alive",
     },
   });
   if (!response || !response.data) {
@@ -37,53 +34,60 @@ async function loadhot() {
   console.log(response.data);
   const videoIds = [];
   let data = response.data["items"][0]["video"][0];
-  const tasks = data.data.map(async (item) => {
-    const title = item.display_name;
-    let id = null;
-    let type = null;
+  const tasks = data.data.map((item) => processItem(item));
 
-    // 查询 TMDB
-    const tmdbUrl = `https://www.themoviedb.org/search/trending?query=${encodeURIComponent(title)}`;
-    const tmdbRes = await Widget.http.get(tmdbUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Host": "www.themoviedb.org",
-      },
-    });
+  const batchSize = 5;
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize);
+    videoIds.push(...(await Promise.all(batch)));
+  }
 
-    if (tmdbRes.data.results.length !== 0) {
-      for (const i of tmdbRes.data.results) {
-        if (i.original_name === title) {
-          id = i.id;
-          type = 'tmdb';
-          break;
-        }
-      }
-    }
-
-    // 查询豆瓣
-    if (id === null) {
-      id = await getdouban(title);
-      if (id) {
-        type = 'douban';
-      } else {
-        id = item.play_url;
-        type = 'url';
-      }
-    }
-
-    return {
-      id: id,
-      type: type,
-      title: title,
-      description: item.description,
-      coverUrl: item.image_cover,
-    };
-  });
-
-  videoIds.push(...await Promise.all(tasks));
   console.log(videoIds);
   return videoIds;
+}
+
+async function processItem(item) {
+  const title = item.display_name;
+  let id = null;
+  let type = null;
+
+  // 查询 TMDB
+  const tmdbUrl = `https://www.themoviedb.org/search/trending?query=${encodeURIComponent(title)}`;
+  const tmdbRes = await Widget.http.get(tmdbUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      "Host": "www.themoviedb.org",
+    },
+  });
+
+  if (tmdbRes.data.results.length !== 0) {
+    for (const i of tmdbRes.data.results) {
+      if (i.original_name === title) {
+        id = i.id;
+        type = 'tmdb';
+        break;
+      }
+    }
+  }
+
+  // 查询豆瓣
+  if (id === null) {
+    id = await getdouban(title);
+    if (id) {
+      type = 'douban';
+    } else {
+      id = item.play_url;
+      type = 'url';
+    }
+  }
+
+  return {
+    id: id,
+    type: type,
+    title: title,
+    description: item.description,
+    coverUrl: item.image_cover,
+  };
 }
 
 async function getdouban(title) {
