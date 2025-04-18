@@ -59,7 +59,7 @@ async function processItem(item) {
       "Host": "www.themoviedb.org",
     },
   });
-
+  console.log(tmdbRes.data)
   if (tmdbRes.data.results.length !== 0) {
     for (const i of tmdbRes.data.results) {
       if (i.original_name === title) {
