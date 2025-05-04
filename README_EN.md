@@ -13,15 +13,15 @@
 
 # ForwardWidget
 
-ForwardWidget is a JS component for building modules, providing rich web-related functionality and data models.
+ForwardWidget is a JS component for building modules that provides rich web-related functionality and data models.
 
 ## Developing Custom Widgets
 
-ForwardWidget supports extending functionality through JavaScript scripts. Each Widget is an independent JavaScript file that must follow a specific structure and specifications.
+ForwardWidget supports extending functionality through JavaScript scripts. Each Widget is an independent JavaScript file that must follow specific structure and specifications.
 
 ### Widget Metadata Configuration
 
-Each Widget script must start with a `WidgetMetadata` object that defines the basic information and functional modules of the Widget:
+Each Widget script must start with a `WidgetMetadata` object that defines the basic information and functional modules:
 
 ```javascript
 var WidgetMetadata = {
@@ -43,7 +43,7 @@ var WidgetMetadata = {
                 {
                     name: "paramName",     // Parameter name
                     title: "Param Title",  // Parameter display title
-                    type: "input",         // Parameter type input | constant | enumeration | count | page
+                    type: "input",         // Parameter type input | constant | enumeration | count | page | offset
                     description: "Description", // Parameter description
                     value: "defaultValue", // Default value
                     belongTo: { // Triggered only when this condition is met
@@ -68,8 +68,7 @@ var WidgetMetadata = {
     ],
     search: {                   // Search function configuration (optional)
         title: "Search",
-        requiresWebView: false,
-        functionName: "search",
+          functionName: "search",
         params: [/* Search parameter configuration */]
     }
 };
@@ -85,7 +84,7 @@ Widget supports the following parameter types:
 - `enumeration`: Enumeration selector
 - `page`: Page number selector
 
-### Handler Function Specifications
+### Handler Function Specification
 
 Each module needs to implement a corresponding handler function with the same name as `functionName`. The handler function receives a `params` object as a parameter containing all configured parameter values.
 
@@ -126,28 +125,16 @@ async function functionName(params = {}) {
 
 ### DOM Operation API
 
-Widget provides the following DOM operation APIs:
+Widget has built-in cheerio for DOM parsing.
 
 ```javascript
-// Parse HTML
-const docId = Widget.dom.parse(htmlString);
-
-// Select elements
-const elements = Widget.dom.select(docId, "selector");
-
-// Select first element
-const element = Widget.dom.selectFirst(docId, "selector");
-
-// Get element text
-const text = Widget.dom.text(elementId);
-
-// Get element attribute
-const value = Widget.dom.attr(elementId, "attributeName");
+// Get cheerio handle
+const $ = Widget.html.load(htmlContent);
 ```
 
 ### HTTP Request API
 
-Widget provides HTTP request APIs:
+Widget provides HTTP request API:
 
 ```javascript
 // GET request
@@ -176,19 +163,22 @@ Handler functions need to return an array of objects that conform to the Forward
 ```javascript
 // Video list item
 {
-    id: "unique_id",           // Based on the main value of different types, when type is url, it's the corresponding url, when type is douban or imdb, id is the corresponding id value
-    type: "type",             // Type identifier url, douban, imdb
-    title: "title",           // Title
-    coverUrl: "url",          // Cover image URL
-    durationText: "00:00",    // Duration text
-    previewUrl: "url",        // Preview video URL
-    description: "description" // Description
-}
-
-// Section data
-{
-    title: "Section Title",   // Section title
-    items: [/* Array of video list items */]
+    id: "unique_id",            // Based on the main value of different types. When type is url, it's the corresponding url. When type is douban, imdb, or tmdb, id is the corresponding id value. For tmdb id, it needs to be composed of type.id, e.g., tv.123 movie.234.
+    type: "type",               // Type identifier url, douban, imdb, tmdb
+    title: "title",             // Title
+    posterPath: "url",          // Vertical cover image URL
+    backdropPath: "url",        // Horizontal cover URL
+    releaseDate: "date",        // Release date
+    mediaType: "tv|movie",      // Media type
+    rating: "5",                // Rating
+    genreTitle: "genre",        // Genre
+    duration: 123,              // Duration number
+    durationText: "00:00",      // Duration text
+    previewUrl: "url",          // Preview video URL
+    videoUrl: "videoUrl",       // Video playback URL
+    link: "link",               // Detail page URL
+    description: "description", // Description
+    childItems: [VideoItem]     // Nested items of current object, maximum one level
 }
 ```
 
@@ -197,10 +187,10 @@ Handler functions need to return an array of objects that conform to the Forward
 1. **Error Handling**
    - Use try-catch to catch exceptions
    - Provide meaningful error messages
-   - Output debug information to the console
+   - Output debug information to console
 
 2. **Parameter Validation**
-   - Validate the existence of required parameters
+   - Validate required parameters
    - Validate parameter values
    - Handle default values
 
@@ -216,7 +206,7 @@ Handler functions need to return an array of objects that conform to the Forward
 
 ### Debugging
 
-The app has built-in module testing tools
+The App has built-in module testing tools
 
 1. Use `console.log()` to output debug information
 2. Check network requests and responses
