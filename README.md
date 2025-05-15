@@ -83,6 +83,7 @@ Widget 支持以下参数类型：
 - `constant`: 常量值
 - `enumeration`: 枚举选择器
 - `page`: 页码选择器
+- `offset`: 当前位置
 
 ### 处理函数规范
 
@@ -154,6 +155,14 @@ const response = await Widget.http.post(url, {
 });
 
 let data = response.data
+```
+
+### 详情数据的 type 为 link 时，加载对应 link 的 API
+
+```javascript
+async function loadDetail(link) {
+    // 需返回一个带有 videoUrl 的对象
+}
 ```
 
 ### 返回数据格式

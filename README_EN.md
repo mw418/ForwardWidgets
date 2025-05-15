@@ -83,6 +83,7 @@ Widget supports the following parameter types:
 - `constant`: Constant value
 - `enumeration`: Enumeration selector
 - `page`: Page number selector
+- `offset`: Current Offset
 
 ### Handler Function Specification
 
@@ -154,6 +155,14 @@ const response = await Widget.http.post(url, {
 });
 
 let data = response.data
+```
+
+### Loading Detail Data When Type is "link"
+
+```javascript
+async function loadDetail(link) {
+    // Must return an object containing videoUrl
+}
 ```
 
 ### Return Data Format

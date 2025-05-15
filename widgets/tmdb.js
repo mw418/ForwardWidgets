@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.tmdb",
   title: "TMDB",
-  version: "1.0.0",
+  version: "1.0.1",
   requiredVersion: "0.0.1",
   description: "获取 TMDB 的榜单数据",
   author: "Forward",
@@ -540,6 +540,9 @@ async function list(params = {}) {
   for (const itemId of coverElements) {
     const $item = $(itemId);
     const link = $item.attr("href");
+    if (!link) {
+      continue;
+    }
     const match = link.match(/^\/(movie|tv)\/([^\/-]+)-/)
     const type = match?.[1];
     const id = match?.[2];
