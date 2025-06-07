@@ -25,32 +25,34 @@ ForwardWidget 支持通过 JavaScript 脚本扩展功能。每个 Widget 都是�
 
 ```javascript
 var WidgetMetadata = {
-    id: "unique_id",           // Widget 唯一标识符
-    title: "Widget Title",     // Widget 显示标题
-    description: "Description", // Widget 描述
-    author: "Author Name",     // 作者
-    site: "https://example.com", // 网站地址
-    version: "1.0.0",         // Widget 版本
-    requiredVersion: "0.0.1",  // 所需 ForwardWidget 版本
-    modules: [                 // 功能模块列表
+    id: "unique_id",                        // Widget 唯一标识符
+    title: "Widget Title",                  // Widget 显示标题
+    description: "Description",             // Widget 描述
+    author: "Author Name",                  // 作者
+    site: "https://example.com",            // 网站地址
+    version: "1.0.0",                       // Widget 版本
+    requiredVersion: "0.0.1",               // 所需 ForwardWidget 版本
+    detailCacheDuration: 60,                // 详情数据缓存时长，单位：秒，默认 60 秒
+    modules: [                              // 功能模块列表
         {
-            title: "Module Title",     // 模块标题
-            description: "Description", // 模块描述
-            requiresWebView: false,    // 是否需要 WebView
-            functionName: "functionName", // 处理函数名
-            sectionMode: false,        // 是否支持分段模式
-            params: [                  // 参数配置
+            title: "Module Title",          // 模块标题
+            description: "Description",     // 模块描述
+            requiresWebView: false,         // 是否需要 WebView
+            functionName: "functionName",   // 处理函数名
+            sectionMode: false,             // 是否支持分段模式
+            cacheDuration: 3600,              //缓存时长，单位：秒，默认 3600 秒
+            params: [                       // 参数配置
                 {
-                    name: "paramName",     // 参数名
-                    title: "Param Title",  // 参数显示标题
-                    type: "input",         // 参数类型 input | constant | enumeration | count | page | offset
+                    name: "paramName",      // 参数名
+                    title: "Param Title",   // 参数显示标题
+                    type: "input",          // 参数类型 input | constant | enumeration | count | page | offset
                     description: "Description", // 参数描述
-                    value: "defaultValue", // 默认值
-                    belongTo: { // 当符合该条件时才会触发该参数
+                    value: "defaultValue",  // 默认值
+                    belongTo: {             // 当符合该条件时才会触发该参数
                         paramName: "param name" // 所属参数的子参数
-                        value: ["value"] // 所属参数包含的值
+                        value: ["value"]    // 所属参数包含的值
                     }
-                    placeholders: [        // 占位符选项
+                    placeholders: [         // 占位符选项
                         {
                             title: "Option Title",
                             value: "optionValue"
@@ -91,36 +93,36 @@ Widget 支持以下参数类型：
 
 ```javascript
 async function functionName(params = {}) {
-    try {
-        // 1. 参数验证
-        if (!params.requiredParam) {
-            throw new Error("缺少必要参数");
-        }
-
-        // 2. 发送请求
-        const response = await Widget.http.get(url, {
-            headers: {
-                "User-Agent": "Mozilla/5.0 ...",
-                "Referer": "https://example.com"
-            }
-        });
-
-        // 3. 解析响应
-        const docId = Widget.dom.parse(response.data);
-        const elements = Widget.dom.select(docId, "selector");
-
-        // 4. 返回结果
-        return elements.map(element => ({
-            id: "unique_id",
-            type: "type",
-            title: "title",
-            coverUrl: "url",
-            // ... 其他属性
-        }));
-    } catch (error) {
-        console.error("处理失败:", error);
-        throw error;
+  try {
+    // 1. 参数验证
+    if (!params.requiredParam) {
+      throw new Error("缺少必要参数");
     }
+
+    // 2. 发送请求
+    const response = await Widget.http.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 ...",
+        Referer: "https://example.com",
+      },
+    });
+
+    // 3. 解析响应
+    const docId = Widget.dom.parse(response.data);
+    const elements = Widget.dom.select(docId, "selector");
+
+    // 4. 返回结果
+    return elements.map((element) => ({
+      id: "unique_id",
+      type: "type",
+      title: "title",
+      coverUrl: "url",
+      // ... 其他属性
+    }));
+  } catch (error) {
+    console.error("处理失败:", error);
+    throw error;
+  }
 }
 ```
 
@@ -140,28 +142,28 @@ Widget 提供了 HTTP 请求 API：
 ```javascript
 // GET 请求
 const response = await Widget.http.get(url, {
-    headers: {
-        "User-Agent": "Mozilla/5.0 ...",
-        "Referer": "https://example.com"
-    }
+  headers: {
+    "User-Agent": "Mozilla/5.0 ...",
+    Referer: "https://example.com",
+  },
 });
 
 // POST 请求
 const response = await Widget.http.post(url, {
-    headers: {
-        "Content-Type": "application/json"
-    },
-    body: JSON.stringify(data)
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(data),
 });
 
-let data = response.data
+let data = response.data;
 ```
 
 ### 详情数据的 type 为 link 时，加载对应 link 的 API
 
 ```javascript
 async function loadDetail(link) {
-    // 需返回一个带有 videoUrl 的对象
+  // 需返回一个带有 videoUrl 的对象
 }
 ```
 
@@ -186,6 +188,7 @@ async function loadDetail(link) {
     previewUrl: "url",          // 预览视频地址
     videoUrl: "videoUrl",       // 视频播放地址
     link: "link",               //详情页打开地址
+    episode: 0,                 // 集数
     description: "description", // 描述
     childItems: [VideoItem]     // 当前对象的嵌套，最多一层
 }
@@ -221,3 +224,4 @@ App 内置了模块测试工具
 2. 检查网络请求和响应
 3. 验证 DOM 解析结果
 4. 测试不同参数组合
+```

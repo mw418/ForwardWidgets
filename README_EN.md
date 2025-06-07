@@ -25,38 +25,40 @@ Each Widget script must start with a `WidgetMetadata` object that defines the ba
 
 ```javascript
 var WidgetMetadata = {
-    id: "unique_id",           // Widget unique identifier
-    title: "Widget Title",     // Widget display title
-    description: "Description", // Widget description
-    author: "Author Name",     // Author
-    site: "https://example.com", // Website URL
-    version: "1.0.0",         // Widget version
-    requiredVersion: "0.0.1",  // Required ForwardWidget version
-    modules: [                 // List of functional modules
+    id: "unique_id",                            // Widget unique identifier
+    title: "Widget Title",                      // Widget display title
+    description: "Description",                 // Widget description
+    author: "Author Name",                      // Author
+    site: "https://example.com",                // Website URL
+    version: "1.0.0",                           // Widget version
+    requiredVersion: "0.0.1",                   // Required ForwardWidget version
+    detailCacheDuration: 60,                    // Duration of detail data cache, unit: seconds. default: 60.
+    modules: [                                  // List of functional modules
         {
-            title: "Module Title",     // Module title
-            description: "Description", // Module description
-            requiresWebView: false,    // Whether WebView is required
-            functionName: "functionName", // Handler function name
-            sectionMode: false,        // Whether section mode is supported
-            params: [                  // Parameter configuration
+            title: "Module Title",              // Module title
+            description: "Description",         // Module description
+            requiresWebView: false,             // Whether WebView is required
+            functionName: "functionName",       // Handler function name
+            sectionMode: false,                 // Whether section mode is supported
+            cacheDuration: 3600,                  // module api cache duration, unit: seconds. default: 3600.
+            params: [                           // Parameter configuration
                 {
-                    name: "paramName",     // Parameter name
-                    title: "Param Title",  // Parameter display title
-                    type: "input",         // Parameter type input | constant | enumeration | count | page | offset
+                    name: "paramName",          // Parameter name
+                    title: "Param Title",       // Parameter display title
+                    type: "input",              // Parameter type input | constant | enumeration | count | page | offset
                     description: "Description", // Parameter description
-                    value: "defaultValue", // Default value
-                    belongTo: { // Triggered only when this condition is met
+                    value: "defaultValue",      // Default value
+                    belongTo: {                 // Triggered only when this condition is met
                         paramName: "param name" // Sub-parameter of the parent parameter
-                        value: ["value"] // Values contained in the parent parameter
+                        value: ["value"]        // Values contained in the parent parameter
                     }
-                    placeholders: [        // Placeholder options
+                    placeholders: [             // Placeholder options
                         {
                             title: "Option Title",
                             value: "optionValue"
                         }
                     ],
-                    enumOptions: [         // Enumeration options
+                    enumOptions: [              // Enumeration options
                         {
                             title: "Option Title",
                             value: "optionValue"
@@ -186,6 +188,7 @@ Handler functions need to return an array of objects that conform to the Forward
     previewUrl: "url",          // Preview video URL
     videoUrl: "videoUrl",       // Video playback URL
     link: "link",               // Detail page URL
+    episode: 1,                 // Episode number
     description: "description", // Description
     childItems: [VideoItem]     // Nested items of current object, maximum one level
 }
