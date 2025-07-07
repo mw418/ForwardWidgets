@@ -192,7 +192,7 @@ async function loadDetail(link) {
     description: "description", // 描述
     childItems: [VideoItem]     // 当前对象的嵌套，最多一层
 }
-
+```
 
 ### 最佳实践
 
@@ -224,4 +224,3 @@ App 内置了模块测试工具
 2. 检查网络请求和响应
 3. 验证 DOM 解析结果
 4. 测试不同参数组合
-```
