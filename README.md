@@ -140,21 +140,24 @@ const $ = Widget.html.load(htmlContent);
 Widget 提供了 HTTP 请求 API：
 
 ```javascript
+
+// options 可以设置一些自定义的内容
+// 比如：
+// {
+//   allow_redirects: false
+//   headers: {
+//     "User-Agent": "Mozilla/5.0 ...",
+//     Referer: "https://example.com",
+//   },
+//   params: {
+//   }
+// }
+
 // GET 请求
-const response = await Widget.http.get(url, {
-  headers: {
-    "User-Agent": "Mozilla/5.0 ...",
-    Referer: "https://example.com",
-  },
-});
+const response = await Widget.http.get(url, options);
 
 // POST 请求
-const response = await Widget.http.post(url, {
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify(data),
-});
+const response = await Widget.http.post(url, body, options);
 
 let data = response.data;
 ```

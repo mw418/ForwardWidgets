@@ -140,21 +140,22 @@ const $ = Widget.html.load(htmlContent);
 Widget provides HTTP request API:
 
 ```javascript
-// GET request
-const response = await Widget.http.get(url, {
-    headers: {
-        "User-Agent": "Mozilla/5.0 ...",
-        "Referer": "https://example.com"
-    }
-});
+// options example
+// {
+//   allow_redirects: false
+//   headers: {
+//     "User-Agent": "Mozilla/5.0 ...",
+//     Referer: "https://example.com",
+//   },
+//   params: {
+//   }
+// }
 
-// POST request
-const response = await Widget.http.post(url, {
-    headers: {
-        "Content-Type": "application/json"
-    },
-    body: JSON.stringify(data)
-});
+// GET 请求
+const response = await Widget.http.get(url, options);
+
+// POST 请求
+const response = await Widget.http.post(url, body, options);
 
 let data = response.data
 ```

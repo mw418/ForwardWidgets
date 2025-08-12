@@ -3,9 +3,14 @@
  * 给 module 指定 type 为 danmu 后，默认会携带以下参数：
  * tmdbId: TMDB ID，Optional
  * type: 类型，tv | movie
- * title: 标题
- * season: 季，电影时为空
- * episode: 集，电影时为空
+ * title: 搜索关键词
+ * seriesName：剧名，Optional
+ * episodeName：集名，Optional
+ * airDate：播出日期，Optional
+ * runtime：时长，Optional
+ * premiereDate：首播日期，Optional
+ * season: 季，电影时为空，Optional
+ * episode: 集，电影时为空，Optional
  * link: 链接，Optional
  * videoUrl: 视频链接，Optional
  * commentId: 弹幕ID，Optional。在搜索到弹幕列表后实际加载时会携带
