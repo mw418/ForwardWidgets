@@ -193,6 +193,7 @@ async function loadDetail(link) {
     link: "link",               //详情页打开地址
     episode: 0,                 // 集数
     description: "description", // 描述
+    playerType: "system",       // 播放器类型 system | app
     childItems: [VideoItem]     // 当前对象的嵌套，最多一层
 }
 ```

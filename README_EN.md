@@ -191,6 +191,7 @@ Handler functions need to return an array of objects that conform to the Forward
     link: "link",               // Detail page URL
     episode: 1,                 // Episode number
     description: "description", // Description
+    playerType: "system",       // player type system | app
     childItems: [VideoItem]     // Nested items of current object, maximum one level
 }
 ```
