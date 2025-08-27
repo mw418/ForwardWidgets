@@ -2,10 +2,6 @@
   "title": "奈菲影视 Widget",
   "description": "奈菲影视官方Widget组件，支持美剧、英剧、韩剧、纪录片等影视内容获取，支持账号登录",
   "icon": "https://nfyingshi.com/favicon.ico",
-  "version": "1.1.0",
-  "author": "Forward",
-  "homepage": "https://nfyingshi.com",
-  "repository": "https://github.com/mw418/ForwardWidgets",
   "widgets": [
     {
       "id": "forward.nfyingshi",
@@ -13,7 +9,7 @@
       "description": "获取奈菲影视的美剧、英剧、韩剧、纪录片等影视内容，支持账号登录",
       "requiredVersion": "0.0.1",
       "version": "1.1.0",
-      "author": "Forward",
+      "author": "mw418",
       "url": "https://raw.githubusercontent.com/mw418/ForwardWidgets/refs/heads/master/nfyingshi.js",
     }
   ]
