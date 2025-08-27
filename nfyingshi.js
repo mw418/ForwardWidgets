@@ -1144,10 +1144,105 @@ async function loadDetail(link) {
 }
 
 /**
+ * 提取描述信息
+ */
+function extractDescription($) {
+  const descSelectors = [
+    '.description', '.synopsis', '.summary', '.plot', '.intro',
+    '.movie-desc', '.content-desc', '.detail-desc',
+    'meta[name="description"]', 'meta[property="og:description"]',
+    '.entry-content p', '.post-content p', 'p'
+  ];
+  
+  for (const selector of descSelectors) {
+    const desc = $(selector).first().text().trim();
+    if (desc && desc.length > 20 && !desc.includes('客服') && !desc.includes('下载')) {
+      return desc;
+    }
+  }
+  return '';
+}
+
+/**
+ * 提取海报信息
+ */
+function extractPoster($, baseUrl) {
+  const posterSelectors = [
+    '.poster img', '.movie-poster img', '.thumb img',
+    'img[alt*="海报"]', 'img[alt*="封面"]', 'meta[property="og:image"]'
+  ];
+  
+  for (const selector of posterSelectors) {
+    const element = $(selector).first();
+    const poster = element.attr('data-src') || element.attr('src') || element.attr('content');
+    if (poster && !poster.includes('blank.gif')) {
+      return poster.startsWith('http') ? poster : 
+             poster.startsWith('//') ? 'https:' + poster : baseUrl + poster;
+    }
+  }
+  return '';
+}
+
+/**
+ * 提取评分信息
+ */
+function extractRating($) {
+  const ratingSelectors = ['.rating', '.score', '.imdb', '.douban', '[class*="rate"]'];
+  for (const selector of ratingSelectors) {
+    const ratingText = $(selector).first().text().trim();
+    const rating = parseFloat(ratingText);
+    if (!isNaN(rating) && rating > 0 && rating <= 10) {
+      return rating;
+    }
+  }
+  return 0;
+}
+
+/**
+ * 提取年份信息
+ */
+function extractYear($) {
+  const yearSelectors = ['.year', '.date', '.release-date', '[class*="year"]'];
+  for (const selector of yearSelectors) {
+    const yearText = $(selector).first().text().trim();
+    const yearMatch = yearText.match(/(\d{4})/);
+    if (yearMatch) {
+      return yearMatch[1];
+    }
+  }
+  return '';
+}
+
+/**
+ * 提取类型信息
+ */
+function extractGenre($) {
+  const genreSelectors = ['.genre', '.category', '.type', '.tag', '[class*="genre"]'];
+  for (const selector of genreSelectors) {
+    const genre = $(selector).first().text().trim();
+    if (genre && genre.length > 0 && genre.length < 20) {
+      return genre;
+    }
+  }
+  return '';
+}
+
+/**
  * 解析多集内容（电视剧）
  */
 async function parseEpisodesDetail($, mainLink, episodeElements) {
   console.log("解析多集内容...");
+  
+  // 获取剧集的整体信息
+  const seriesTitle = $('h1, .title, .movie-title, .series-title').first().text().trim();
+  const seriesDescription = extractDescription($);
+  const seriesPoster = extractPoster($, BASE_URL);
+  const seriesRating = extractRating($);
+  const seriesYear = extractYear($);
+  const seriesGenre = extractGenre($);
+  
+  console.log(`剧集信息: ${seriesTitle}`);
+  console.log(`剧集描述: ${seriesDescription.substring(0, 100)}...`);
   
   const episodes = [];
   const maxEpisodes = Math.min(episodeElements.length, 50); // 限制最多50集，避免请求过多
@@ -1177,10 +1272,19 @@ async function parseEpisodesDetail($, mainLink, episodeElements) {
           const bestSource = selectBestQuality(videoSources);
           
           if (bestSource) {
+            // 获取该集的具体描述
+            const episodeDescription = extractDescription(episode$) || `${seriesTitle} ${episodeTitle}`;
+            
             episodes.push({
               id: `episode_${i + 1}`,
-              type: "link",
+              type: "link", 
               title: episodeTitle,
+              description: episodeDescription,
+              posterPath: seriesPoster,
+              backdropPath: seriesPoster,
+              releaseDate: seriesYear,
+              rating: seriesRating,
+              genreTitle: seriesGenre,
               episode: i + 1,
               videoUrl: bestSource.url,
               quality: bestSource.quality || 'auto',
@@ -1205,12 +1309,26 @@ async function parseEpisodesDetail($, mainLink, episodeElements) {
   console.log(`成功解析 ${episodes.length} 集内容`);
   
   return {
+    // 主要信息
+    title: seriesTitle,
+    description: seriesDescription,
+    posterPath: seriesPoster,
+    backdropPath: seriesPoster,
+    releaseDate: seriesYear,
+    rating: seriesRating,
+    genreTitle: seriesGenre,
+    mediaType: "tv",
+    
+    // 播放信息
     videoUrl: episodes.length > 0 ? episodes[0].videoUrl : '',
     quality: episodes.length > 0 ? episodes[0].quality : '',
     playerType: "system",
+    
+    // 分集信息
     episodes: episodes,
     totalEpisodes: episodes.length,
-    currentEpisode: 1
+    currentEpisode: 1,
+    childItems: episodes // ForwardWidgets标准格式
   };
 }
 
