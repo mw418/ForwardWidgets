@@ -1340,8 +1340,34 @@ async function selectBestQuality(videoSources) {
   
   // 按画质排序
   uniqueSources.sort((a, b) => {
-    const priorityA = QUALITY_PRIORITY[a.quality.toLowerCase()] || 0;
-    const priorityB = QUALITY_PRIORITY[b.quality.toLowerCase()] || 0;
+    // 智能匹配画质优先级，支持中英文和大小写
+    const getPriority = (quality) => {
+      if (!quality) return 0;
+      
+      // 直接匹配
+      if (QUALITY_PRIORITY[quality]) return QUALITY_PRIORITY[quality];
+      
+      // 小写匹配
+      const lower = quality.toLowerCase();
+      if (QUALITY_PRIORITY[lower]) return QUALITY_PRIORITY[lower];
+      
+      // 特殊映射
+      const mappings = {
+        'original': 150,    // 原画
+        '原画': 150,
+        '1080p': 100,
+        '1080P': 100, 
+        'fhd': 100,
+        '720p': 80,
+        '720P': 80,
+        'hd': 80
+      };
+      
+      return mappings[quality] || mappings[lower] || 0;
+    };
+    
+    const priorityA = getPriority(a.quality);
+    const priorityB = getPriority(b.quality);
     
     if (priorityA !== priorityB) {
       return priorityB - priorityA; // 降序，高画质优先
