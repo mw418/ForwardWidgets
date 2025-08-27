@@ -1303,7 +1303,7 @@ async function parseEpisodesDetail($, mainLink, episodeElements) {
             
             episodes.push({
               id: `episode_${i + 1}`,
-              type: "link", 
+              type: "link",
               title: episodeTitle,
               description: episodeDescription,
               posterPath: seriesPoster,
@@ -1311,12 +1311,12 @@ async function parseEpisodesDetail($, mainLink, episodeElements) {
               releaseDate: seriesYear,
               rating: seriesRating,
               genreTitle: seriesGenre,
-              episode: i + 1,
+              link: episodeLink,
               videoUrl: bestSource.url,
               quality: bestSource.quality || 'auto',
+              mediaType: "tv",
               playerType: "system",
-              link: episodeLink,
-              mediaType: "tv"
+              episode: i + 1 // 集数信息
             });
             console.log(`✅ 第${i + 1}集解析成功: ${bestSource.url.substring(0, 50)}...`);
           }
@@ -1334,8 +1334,11 @@ async function parseEpisodesDetail($, mainLink, episodeElements) {
   
   console.log(`成功解析 ${episodes.length} 集内容`);
   
+  // 按照ForwardWidgets标准格式返回
   return {
-    // 主要信息
+    // 主要信息 - 作为剧集整体信息
+    id: mainLink.replace(/[^a-zA-Z0-9]/g, '_'),
+    type: "link",
     title: seriesTitle,
     description: seriesDescription,
     posterPath: seriesPoster,
@@ -1344,17 +1347,19 @@ async function parseEpisodesDetail($, mainLink, episodeElements) {
     rating: seriesRating,
     genreTitle: seriesGenre,
     mediaType: "tv",
-    
-    // 播放信息
-    videoUrl: episodes.length > 0 ? episodes[0].videoUrl : '',
-    quality: episodes.length > 0 ? episodes[0].quality : '',
     playerType: "system",
     
-    // 分集信息
-    episodes: episodes,
+    // 第一集作为主播放地址
+    link: mainLink,
+    videoUrl: episodes.length > 0 ? episodes[0].videoUrl : '',
+    quality: episodes.length > 0 ? episodes[0].quality : 'auto',
+    
+    // ⭐ 关键：每集信息存放在 childItems 中（ForwardWidgets标准）
+    childItems: episodes,
+    
+    // 额外的剧集统计信息
     totalEpisodes: episodes.length,
-    currentEpisode: 1,
-    childItems: episodes // ForwardWidgets标准格式
+    currentEpisode: 1
   };
 }
 
