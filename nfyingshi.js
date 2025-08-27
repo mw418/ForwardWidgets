@@ -443,36 +443,42 @@ function parseVideoItem($, element, baseUrl = BASE_URL) {
     
     console.log(`找到视频: ${title} -> ${fullLink}`);
     
-    // 获取封面图
+    // 获取封面图 - 优先处理懒加载图片
     let posterPath = '';
-    const imgSelectors = [
-      'img[src]',
-      'img[data-src]',
-      'img[data-original]',
-      '[style*="background-image"]'
-    ];
+    const imgElement = $item.find('img').first();
     
-    for (const selector of imgSelectors) {
-      const imgElement = $item.find(selector).first();
-      if (imgElement.length > 0) {
-        posterPath = imgElement.attr('src') || imgElement.attr('data-src') || imgElement.attr('data-original') || '';
-        
-        // 从style属性中提取背景图片
-        if (!posterPath && selector.includes('style')) {
-          const style = imgElement.attr('style') || '';
-          const bgMatch = style.match(/background-image:\s*url\(['"]?([^'"]+)['"]?\)/);
-          if (bgMatch) {
-            posterPath = bgMatch[1];
+    if (imgElement.length > 0) {
+      // 优先获取data-src（懒加载的真实图片地址）
+      posterPath = imgElement.attr('data-src') || imgElement.attr('data-original') || imgElement.attr('src') || '';
+      
+      console.log(`图片信息: src="${imgElement.attr('src')}", data-src="${imgElement.attr('data-src')}"`);
+      
+      // 如果仍然是blank.gif，尝试其他属性
+      if (posterPath.includes('blank.gif') || !posterPath) {
+        const altAttributes = ['data-lazy-src', 'data-image', 'data-bg'];
+        for (const attr of altAttributes) {
+          const altSrc = imgElement.attr(attr);
+          if (altSrc && !altSrc.includes('blank.gif')) {
+            posterPath = altSrc;
+            break;
           }
         }
-        
-        if (posterPath) break;
       }
     }
     
-    if (posterPath && !posterPath.startsWith('http')) {
+    // 处理相对路径
+    if (posterPath && !posterPath.startsWith('http') && !posterPath.includes('blank.gif')) {
       posterPath = posterPath.startsWith('//') ? 'https:' + posterPath : 
                    posterPath.startsWith('/') ? baseUrl + posterPath : baseUrl + '/' + posterPath;
+    }
+    
+    // 如果还是blank.gif，尝试从alt属性构建默认图片
+    if (posterPath.includes('blank.gif') || !posterPath) {
+      const altText = imgElement.attr('alt') || title;
+      if (altText) {
+        // 使用一个通用的占位符服务或者设置为空
+        posterPath = `https://via.placeholder.com/300x450/333333/ffffff?text=${encodeURIComponent(altText)}`;
+      }
     }
     
     // 获取评分
@@ -526,7 +532,7 @@ function parseVideoItem($, element, baseUrl = BASE_URL) {
       genreTitle: genreText,
       link: fullLink,
       mediaType: inferMediaType(title, genreText),
-      playerType: "app"
+      playerType: "system" // 改为system，表示使用系统播放器播放解析出的直接URL
     };
     
     console.log(`成功解析视频项目: ${title}`);
@@ -981,23 +987,34 @@ function parseVideoSources($, scripts) {
   scripts.each((i, script) => {
     const scriptContent = $(script).html() || '';
     
-    // 常见的视频源匹配模式
+    // 常见的视频源匹配模式 - 扩展更多模式
     const patterns = [
       // 标准视频链接
-      /(https?:\/\/[^"'\s]+\.(?:mp4|m3u8|flv))(?:\?[^"'\s]*)?/gi,
+      /(https?:\/\/[^"'\s]+\.(?:mp4|m3u8|flv|avi|mkv|ts))(?:\?[^"'\s]*)?/gi,
       // 包含画质信息的视频源
-      /["']([^"']*(?:1080p|720p|480p|360p)[^"']*\.(?:mp4|m3u8|flv)[^"']*)["']/gi,
+      /["']([^"']*(?:4k|2160p|1080p|720p|480p|360p|240p)[^"']*\.(?:mp4|m3u8|flv|avi|mkv|ts)[^"']*)["']/gi,
       // 播放器配置中的视频源
-      /(?:videoUrl|playUrl|src|url)["']?\s*:\s*["']([^"']+\.(?:mp4|m3u8|flv)[^"']*)["']/gi,
+      /(?:videoUrl|playUrl|src|url|video|play)["']?\s*:\s*["']([^"']+\.(?:mp4|m3u8|flv|avi|mkv|ts)[^"']*)["']/gi,
       // m3u8播放列表
-      /["']([^"']*\.m3u8[^"']*)["']/gi
+      /["']([^"']*\.m3u8[^"']*)["']/gi,
+      // 奈菲影视特有的视频地址模式
+      /(?:play_url|video_url|stream_url)["']?\s*:\s*["']([^"']+)["']/gi,
+      // iframe嵌入的播放器地址
+      /src\s*=\s*["']([^"']*(?:player|play|video)[^"']*)["']/gi,
+      // 更宽泛的视频URL匹配
+      /(https?:\/\/[^"'\s]*(?:cdn|stream|video|play)[^"'\s]*\.(?:mp4|m3u8|flv)[^"'\s]*)/gi
     ];
     
     for (const pattern of patterns) {
       let match;
       while ((match = pattern.exec(scriptContent)) !== null) {
-        const url = match[1];
+        const url = match[1] || match[0];
         if (url && url.startsWith('http')) {
+          // 过滤掉明显不是视频的URL
+          if (url.includes('googleapis.com') || url.includes('analytics') || url.includes('.css') || url.includes('.js')) {
+            continue;
+          }
+          
           // 尝试从URL中推断画质
           let quality = '';
           const qualityMatch = url.match(/(4k|2160p|1080p|720p|480p|360p|240p)/i);
@@ -1011,6 +1028,8 @@ function parseVideoSources($, scripts) {
             source: 'script',
             pattern: pattern.source
           });
+          
+          console.log(`发现视频源: [${quality || '未知'}] ${url.substring(0, 100)}...`);
         }
       }
     }
@@ -1106,48 +1125,130 @@ async function loadDetail(link) {
       throw new Error("解析详情页面失败");
     }
     
-    // 查找所有脚本标签
-    const scripts = $('script');
-    console.log(`找到 ${scripts.length} 个脚本标签`);
+    // 检查是否为多集内容（电视剧、美剧等）
+    const episodeElements = $('.episode-list a, .play-list a, [class*="episode"] a, [class*="play"] a');
+    console.log(`找到 ${episodeElements.length} 个分集链接`);
     
-    // 解析所有可能的视频源
-    const videoSources = parseVideoSources($, scripts);
-    console.log(`解析到 ${videoSources.length} 个视频源`);
-    
-    // 输出所有找到的视频源（用于调试）
-    if (videoSources.length > 0) {
-      console.log("所有视频源:");
-      videoSources.forEach((source, index) => {
-        console.log(`  ${index + 1}. [${source.quality || '未知画质'}] ${source.url} (来源: ${source.source})`);
-      });
-    }
-    
-    // 选择最佳画质
-    const bestSource = selectBestQuality(videoSources);
-    
-    if (bestSource) {
-      console.log(`选择最佳画质: [${bestSource.quality || '默认'}] ${bestSource.url}`);
-      return {
-        videoUrl: bestSource.url,
-        quality: bestSource.quality || 'auto',
-        playerType: "system",
-        allSources: videoSources.map(s => ({
-          url: s.url,
-          quality: s.quality || 'auto'
-        }))
-      };
+    if (episodeElements.length > 1) {
+      // 多集内容 - 解析每一集
+      return await parseEpisodesDetail($, link, episodeElements);
     } else {
-      console.log("未找到可用的视频源");
-      return {
-        videoUrl: '',
-        quality: '',
-        playerType: "app",
-        allSources: []
-      };
+      // 单集内容（电影） - 解析视频源
+      return await parseSingleVideoDetail($, link);
     }
     
   } catch (error) {
     console.error("加载详情失败:", error);
     throw error;
+  }
+}
+
+/**
+ * 解析多集内容（电视剧）
+ */
+async function parseEpisodesDetail($, mainLink, episodeElements) {
+  console.log("解析多集内容...");
+  
+  const episodes = [];
+  const maxEpisodes = Math.min(episodeElements.length, 50); // 限制最多50集，避免请求过多
+  
+  for (let i = 0; i < maxEpisodes; i++) {
+    const episodeElement = $(episodeElements[i]);
+    const episodeTitle = episodeElement.text().trim() || `第${i + 1}集`;
+    let episodeLink = episodeElement.attr('href');
+    
+    if (episodeLink && !episodeLink.startsWith('http')) {
+      episodeLink = episodeLink.startsWith('/') ? BASE_URL + episodeLink : BASE_URL + '/' + episodeLink;
+    }
+    
+    console.log(`解析第${i + 1}集: ${episodeTitle} -> ${episodeLink}`);
+    
+    if (episodeLink) {
+      try {
+        // 获取该集的播放页面
+        const episodeResponse = await Widget.http.get(episodeLink, {
+          headers: getAuthenticatedHeaders()
+        });
+        
+        if (episodeResponse && episodeResponse.data) {
+          const episode$ = Widget.html.load(episodeResponse.data);
+          const scripts = episode$('script');
+          const videoSources = parseVideoSources(episode$, scripts);
+          const bestSource = selectBestQuality(videoSources);
+          
+          if (bestSource) {
+            episodes.push({
+              id: `episode_${i + 1}`,
+              type: "link",
+              title: episodeTitle,
+              episode: i + 1,
+              videoUrl: bestSource.url,
+              quality: bestSource.quality || 'auto',
+              playerType: "system",
+              link: episodeLink,
+              mediaType: "tv"
+            });
+            console.log(`✅ 第${i + 1}集解析成功: ${bestSource.url.substring(0, 50)}...`);
+          }
+        }
+      } catch (error) {
+        console.error(`解析第${i + 1}集失败:`, error.message);
+      }
+      
+      // 添加小延迟，避免请求过快
+      if (i < maxEpisodes - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+  }
+  
+  console.log(`成功解析 ${episodes.length} 集内容`);
+  
+  return {
+    videoUrl: episodes.length > 0 ? episodes[0].videoUrl : '',
+    quality: episodes.length > 0 ? episodes[0].quality : '',
+    playerType: "system",
+    episodes: episodes,
+    totalEpisodes: episodes.length,
+    currentEpisode: 1
+  };
+}
+
+/**
+ * 解析单集内容（电影）
+ */
+async function parseSingleVideoDetail($, link) {
+  console.log("解析单集内容...");
+  
+  // 查找所有脚本标签
+  const scripts = $('script');
+  console.log(`找到 ${scripts.length} 个脚本标签`);
+  
+  // 解析所有可能的视频源
+  const videoSources = parseVideoSources($, scripts);
+  console.log(`解析到 ${videoSources.length} 个视频源`);
+  
+  // 选择最佳画质
+  const bestSource = selectBestQuality(videoSources);
+  
+  if (bestSource) {
+    console.log(`选择最佳画质: [${bestSource.quality || '默认'}] ${bestSource.url}`);
+    return {
+      videoUrl: bestSource.url,
+      quality: bestSource.quality || 'auto',
+      playerType: "system",
+      allSources: videoSources.map(s => ({
+        url: s.url,
+        quality: s.quality || 'auto'
+      }))
+    };
+  } else {
+    console.log("未找到可用的视频源");
+    return {
+      videoUrl: '',
+      quality: '',
+      playerType: "app",
+      allSources: []
+    };
   }
 }
