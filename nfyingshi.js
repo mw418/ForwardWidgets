@@ -1126,14 +1126,40 @@ async function loadDetail(link) {
     }
     
     // 检查是否为多集内容（电视剧、美剧等）
-    const episodeElements = $('.episode-list a, .play-list a, [class*="episode"] a, [class*="play"] a');
-    console.log(`找到 ${episodeElements.length} 个分集链接`);
+    // 扩展更多可能的分集选择器
+    const episodeSelectors = [
+      '.episode-list a', '.play-list a', '.playlist a',
+      '[class*="episode"] a', '[class*="play"] a', '[class*="集"] a',
+      '.video-list a', '.series-list a', '.chapter-list a',
+      'ul li a[href*="play"]', 'ul li a[href*="episode"]', 'ul li a[href*="ep"]',
+      '.tabs-content a', '.tab-content a', '.content-tab a',
+      'a[title*="第"]', 'a[title*="集"]', 'a[title*="EP"]'
+    ];
     
-    if (episodeElements.length > 1) {
+    let episodeElements = $();
+    let foundEpisodes = 0;
+    
+    for (const selector of episodeSelectors) {
+      const elements = $(selector);
+      console.log(`测试分集选择器 "${selector}": 找到 ${elements.length} 个元素`);
+      
+      if (elements.length > 1) {
+        episodeElements = elements;
+        foundEpisodes = elements.length;
+        console.log(`✅ 使用选择器 "${selector}" 找到 ${foundEpisodes} 个分集`);
+        break;
+      }
+    }
+    
+    console.log(`总共找到 ${foundEpisodes} 个分集链接`);
+    
+    if (foundEpisodes > 1) {
       // 多集内容 - 解析每一集
+      console.log(`检测到多集内容，开始解析 ${foundEpisodes} 集`);
       return await parseEpisodesDetail($, link, episodeElements);
     } else {
-      // 单集内容（电影） - 解析视频源
+      // 单集内容（电影）或未找到分集 - 解析视频源
+      console.log("检测到单集内容或未找到分集，按单集处理");
       return await parseSingleVideoDetail($, link);
     }
     
