@@ -1128,6 +1128,8 @@ async function loadDetail(link) {
     // 检查是否为多集内容（电视剧、美剧等）
     // 扩展更多可能的分集选择器
     const episodeSelectors = [
+      '.paly_list_btn a',           // 奈菲影视主要分集结构 (注意是paly不是play) 
+      '.play_list_btn a',           // 可能的拼写变体
       '.episode-list a', '.play-list a', '.playlist a',
       '[class*="episode"] a', '[class*="play"] a', '[class*="集"] a',
       '.video-list a', '.series-list a', '.chapter-list a',
@@ -1143,11 +1145,65 @@ async function loadDetail(link) {
       const elements = $(selector);
       console.log(`测试分集选择器 "${selector}": 找到 ${elements.length} 个元素`);
       
+      // 调试：显示前3个元素的内容
+      if (elements.length > 0) {
+        elements.slice(0, 3).each((i, el) => {
+          const $el = $(el);
+          const href = $el.attr('href') || 'N/A';
+          const text = $el.text().trim() || 'N/A';
+          console.log(`  元素${i + 1}: href="${href}", text="${text}"`);
+        });
+      }
+      
       if (elements.length > 1) {
         episodeElements = elements;
         foundEpisodes = elements.length;
         console.log(`✅ 使用选择器 "${selector}" 找到 ${foundEpisodes} 个分集`);
         break;
+      }
+    }
+    
+    // 如果没找到分集，尝试更宽泛的搜索
+    if (foundEpisodes <= 1) {
+      console.log("尝试更宽泛的分集搜索...");
+      
+      // 查找任何包含"第X集"、"EP"、"Episode"等文本的链接
+      const broadSelectors = [
+        'a[href*="play"]', 
+        'a[href*="episode"]', 
+        'a[href*="ep"]',
+        'a[title*="第"]',
+        'a:contains("第")',
+        'a:contains("EP")',
+        'a:contains("集")'
+      ];
+      
+      for (const selector of broadSelectors) {
+        try {
+          const elements = $(selector);
+          console.log(`宽泛搜索 "${selector}": 找到 ${elements.length} 个元素`);
+          
+          if (elements.length > 1) {
+            // 过滤出真正的分集链接
+            const episodeLinks = elements.filter((i, el) => {
+              const text = $(el).text().trim();
+              const href = $(el).attr('href') || '';
+              return (text.includes('第') && text.includes('集')) || 
+                     text.match(/EP?\d+/i) ||
+                     href.includes('play') ||
+                     href.includes('episode');
+            });
+            
+            if (episodeLinks.length > 1) {
+              episodeElements = episodeLinks;
+              foundEpisodes = episodeLinks.length;
+              console.log(`✅ 宽泛搜索成功，找到 ${foundEpisodes} 个分集`);
+              break;
+            }
+          }
+        } catch (e) {
+          // 某些选择器可能不被支持，继续下一个
+        }
       }
     }
     
