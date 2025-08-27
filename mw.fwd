@@ -15,31 +15,6 @@
       "version": "1.1.0",
       "author": "Forward",
       "url": "https://raw.githubusercontent.com/mw418/ForwardWidgets/refs/heads/master/nfyingshi.js",
-      "features": [
-        "热映推荐",
-        "美剧资源",
-        "英剧资源", 
-        "韩剧资源",
-        "真人秀节目",
-        "纪录片资源",
-        "热门电影",
-        "搜索功能",
-        "账号登录支持",
-        "游客模式"
-      ],
-      "categories": [
-        "影视",
-        "娱乐",
-        "流媒体"
-      ],
-      "tags": [
-        "美剧",
-        "英剧", 
-        "韩剧",
-        "电影",
-        "纪录片",
-        "真人秀"
-      ]
     }
   ]
 }
