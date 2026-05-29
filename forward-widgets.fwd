@@ -8,7 +8,7 @@
       "title": "TMDB",
       "description": "获取 TMDB 的榜单数据",
       "requiredVersion": "0.0.1",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "author": "Forward",
       "url": "https://assets.vvebo.vip/scripts/tmdb.js"
     },
@@ -33,9 +33,9 @@
     {
       "id": "forward.danmu",
       "title": "自定义弹幕",
-      "description": "从指定服务器获取弹幕",
+      "description": "全局参数支持多个自定义服务器，以换行分割。",
       "requiredVersion": "0.0.2",
-      "version": "1.0.2",
+      "version": "1.1.6",
       "author": "Forward",
       "url": "https://assets.vvebo.vip/scripts/danmu.js"
     },

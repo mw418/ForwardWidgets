@@ -164,13 +164,44 @@ const response = await Widget.http.post(url, body, options);
 let data = response.data
 ```
 
+### List Module API
+
+A normal video list module should be declared in `WidgetMetadata.modules`, with `functionName` pointing to the handler. The handler returns `VideoItem[]`.
+
+```javascript
+async function loadList(params) {
+  return [
+    {
+      id: 550,
+      type: "tmdb",
+      title: "Fight Club",
+      mediaType: "movie",
+    },
+  ];
+}
+```
+
+When users open a list from a category or actor on the detail page, the client goes back to the list module that produced the current item and passes the selected id in `params`:
+
+```javascript
+// Genre id, matching genreItems[].id
+params.genreId
+
+// Actor / person id
+params.peopleId
+```
+
+Category and actor objects in list items must include `id`; otherwise the detail page cannot open the matching list.
+
 ### Loading Detail Data When Type is "link"
 
 ```javascript
 async function loadDetail(link) {
-    // Must return an object containing videoUrl
+    // Return VideoItem or VideoItem[], using the same model as loadList items
 }
 ```
+
+`loadDetail` is a top-level Widget function, not a module in `modules`. The detail page calls it with the list item's `link` to supplement detail data such as stills, trailers, categories, actors, related items, and playback URL.
 
 ### Return Data Format
 
@@ -188,17 +219,42 @@ Handler functions need to return an array of objects that conform to the Forward
     mediaType: "tv|movie",      // Media type
     rating: "5",                // Rating
     genreTitle: "genre",        // Genre
+    genreItems: [               // Clickable categories; detail page uses id to open a list
+      {
+        id: "action",
+        title: "Action"
+      }
+    ],
+    peoples: [                  // Actors / people; detail page uses id to open a list
+      {
+        id: "person_id",
+        title: "Actor Name",
+        avatar: "url",
+        role: "Role"
+      }
+    ],
     duration: 123,              // Duration number
     durationText: "00:00",      // Duration text
     previewUrl: "url",          // Preview video URL
+    trailers: [                 // Trailers; object format is recommended
+      {
+        coverUrl: "url",        // Trailer cover
+        url: "videoUrl"         // Trailer URL
+      }
+    ],
     videoUrl: "videoUrl",       // Video playback URL
     link: "link",               // Detail page URL
     episode: 1,                 // Episode number
     description: "description", // Description
     playerType: "system",       // player type system | app
-    childItems: [VideoItem]     // Nested items of current object, maximum one level
+    backdropPaths: ["url"],     // Stills / screenshots shown on detail page
+    childItems: [VideoItem],    // Nested items of current object, maximum one level
+    episodeItems: [VideoItem],  // Episode list
+    relatedItems: [VideoItem]   // Related recommendations
 }
 ```
+
+`loadList` and `loadDetail` should use the same `VideoItem` model. `loadDetail` may return only the fields needed by the detail page, but field names and structures should stay consistent.
 
 ### Best Practices
 

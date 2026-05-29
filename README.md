@@ -166,13 +166,44 @@ const response = await Widget.http.post(url, body, options);
 let data = response.data;
 ```
 
+### 列表模块 API
+
+普通视频列表模块需要在 `WidgetMetadata.modules` 中声明一个模块，并由 `functionName` 指向实际函数。函数返回 `VideoItem[]`。
+
+```javascript
+async function loadList(params) {
+  return [
+    {
+      id: 550,
+      type: "tmdb",
+      title: "Fight Club",
+      mediaType: "movie",
+    },
+  ];
+}
+```
+
+当用户从详情页点击分类或演员打开列表时，客户端会回到当前条目所属的列表模块，并把对应 id 传回 `params`：
+
+```javascript
+// 分类 id，对应 genreItems[].id
+params.genreId
+
+// 演员/人物 id
+params.peopleId
+```
+
+列表条目里的分类和演员需要带 `id`，否则详情页无法通过它们打开对应列表。
+
 ### 详情数据的 type 为 link 时，加载对应 link 的 API
 
 ```javascript
 async function loadDetail(link) {
-  // 需返回一个带有 videoUrl 的对象
+  // 返回 VideoItem 或 VideoItem[]，模型与 loadList 返回项一致
 }
 ```
+
+`loadDetail` 是 Widget 顶层函数，不属于某个 `modules` 配置。详情页会用列表条目的 `link` 调用它，用于补充剧照、预告片、分类、演员、相关推荐、播放地址等详情数据。
 
 ### 返回数据格式
 
@@ -190,17 +221,42 @@ async function loadDetail(link) {
     mediaType: "tv|movie",      //媒体类型
     rating: "5",                //评分
     genreTitle: "genre",        //分类
+    genreItems: [               // 可点击分类，详情页会用 id 打开列表
+      {
+        id: "action",
+        title: "动作"
+      }
+    ],
+    peoples: [                  // 演员/人物，详情页会用 id 打开列表
+      {
+        id: "person_id",
+        title: "演员名",
+        avatar: "url",
+        role: "角色"
+      }
+    ],
     duration: 123,              //时长数字
     durationText: "00:00",      // 时长文本
     previewUrl: "url",          // 预览视频地址
+    trailers: [                 // 预告片，推荐使用对象格式
+      {
+        coverUrl: "url",        // 预告片封面
+        url: "videoUrl"         // 预告片地址
+      }
+    ],
     videoUrl: "videoUrl",       // 视频播放地址
     link: "link",               //详情页打开地址
     episode: 0,                 // 集数
     description: "description", // 描述
     playerType: "system",       // 播放器类型 system | app
-    childItems: [VideoItem]     // 当前对象的嵌套，最多一层
+    backdropPaths: ["url"],     // 剧照/截图列表，详情页展示
+    childItems: [VideoItem],    // 当前对象的嵌套，最多一层
+    episodeItems: [VideoItem],  // 剧集列表
+    relatedItems: [VideoItem]   // 相关推荐
 }
 ```
+
+`loadList` 和 `loadDetail` 应保持同一套 `VideoItem` 模型。`loadDetail` 可只返回详情页需要补充的字段，但字段名和结构不要另起一套。
 
 ### 最佳实践
 

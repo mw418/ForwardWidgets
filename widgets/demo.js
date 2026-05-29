@@ -37,8 +37,93 @@ WidgetMetadata = {
       type: "subtitle",
       params: [],
     },
+    {
+      id: "loadList",
+      title: "获取列表",
+      functionName: "loadList",
+      params: [
+        {
+          name: "page",
+          title: "页码",
+          type: "page",
+        },
+        {
+          name: "count",
+          title: "数量",
+          type: "count",
+          value: "12",
+        },
+      ],
+    },
   ],
 };
+
+var DEMO_VIDEO_ITEMS = [
+  {
+    id: "demo-movie-1",
+    type: "url",
+    title: "演示电影 - 带详情数据",
+    description: "列表项可以带分类和演员；点击详情后可通过 loadDetail 补全剧照、预告片和相关推荐。",
+    posterPath: "https://picsum.photos/seed/forward-demo-poster-1/600/900",
+    backdropPath: "https://picsum.photos/seed/forward-demo-backdrop-1/1280/720",
+    mediaType: "movie",
+    genreItems: [
+      { id: "action", title: "动作" },
+      { id: "sci-fi", title: "科幻" },
+    ],
+    peoples: [
+      {
+        id: "person-1",
+        title: "演示演员",
+        avatar: "https://picsum.photos/seed/forward-demo-person-1/400/400",
+        role: "主演",
+      },
+      {
+        id: "person-2",
+        title: "演示导演",
+        avatar: "https://picsum.photos/seed/forward-demo-person-2/400/400",
+        role: "导演",
+      },
+    ],
+    link: "demo-detail-1",
+  },
+  {
+    id: 550,
+    type: "tmdb",
+    title: "Fight Club",
+    mediaType: "movie",
+  },
+  {
+    id: 27205,
+    type: "tmdb",
+    title: "Inception",
+    mediaType: "movie",
+  },
+  {
+    id: 603,
+    type: "tmdb",
+    title: "The Matrix",
+    mediaType: "movie",
+  },
+  {
+    id: 1399,
+    type: "tmdb",
+    title: "Game of Thrones",
+    mediaType: "tv",
+  },
+  {
+    id: 1396,
+    type: "tmdb",
+    title: "Breaking Bad",
+    mediaType: "tv",
+  },
+  {
+    id: 66732,
+    type: "tmdb",
+    title: "Stranger Things",
+    mediaType: "tv",
+  },
+];
 
 async function loadResource(params) {
   const { tmdbId, imdbId, id, type, seriesName, episodeName, season, episode, link } = params;
@@ -75,4 +160,116 @@ async function loadSubtitle(params) {
         url: "https://dl.subhd.tv/2025/08/1754195078288.srt",
     },
   ]
+}
+
+async function loadList(params) {
+  var page = Number(params.page || 1);
+  var count = Number(params.count || 12);
+  var start = (page - 1) * count;
+  var genreId = String(params.genreId || "");
+  var peopleId = String(params.peopleId || "");
+
+  var result = [];
+  for (var i = 0; i < DEMO_VIDEO_ITEMS.length; i++) {
+    var item = DEMO_VIDEO_ITEMS[i];
+    if (genreId && !hasGenre(item, genreId)) {
+      continue;
+    }
+    if (peopleId && !hasPeople(item, peopleId)) {
+      continue;
+    }
+    result.push(item);
+  }
+
+  return result.slice(start, start + count);
+}
+
+function hasGenre(item, genreId) {
+  if (!item.genreItems) {
+    return false;
+  }
+  for (var i = 0; i < item.genreItems.length; i++) {
+    if (String(item.genreItems[i].id) === genreId) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasPeople(item, peopleId) {
+  if (!item.peoples) {
+    return false;
+  }
+  for (var i = 0; i < item.peoples.length; i++) {
+    if (String(item.peoples[i].id) === peopleId) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function loadDetail(link) {
+  if (link !== "demo-detail-1") {
+    return null;
+  }
+
+  return {
+    id: "demo-movie-1",
+    type: "url",
+    title: "演示电影 - 带详情数据",
+    description: "loadDetail 返回和 loadList 一致的 VideoItem 模型，可补充详情页展示数据。",
+    posterPath: "https://picsum.photos/seed/forward-demo-poster-1/600/900",
+    backdropPath: "https://picsum.photos/seed/forward-demo-backdrop-1/1280/720",
+    backdropPaths: [
+      "https://picsum.photos/seed/forward-demo-still-1/1280/720",
+      "https://picsum.photos/seed/forward-demo-still-2/1280/720",
+      "https://picsum.photos/seed/forward-demo-still-3/1280/720",
+    ],
+    trailers: [
+      {
+        coverUrl: "https://picsum.photos/seed/forward-demo-trailer-1/640/360",
+        url: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+      },
+    ],
+    videoUrl: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+    releaseDate: "2025-01-01",
+    mediaType: "movie",
+    rating: 8.4,
+    genreItems: [
+      { id: "action", title: "动作" },
+      { id: "sci-fi", title: "科幻" },
+    ],
+    peoples: [
+      {
+        id: "person-1",
+        title: "演示演员",
+        avatar: "https://picsum.photos/seed/forward-demo-person-1/400/400",
+        role: "主演",
+      },
+      {
+        id: "person-2",
+        title: "演示导演",
+        avatar: "https://picsum.photos/seed/forward-demo-person-2/400/400",
+        role: "导演",
+      },
+    ],
+    relatedItems: [
+      {
+        id: "demo-related-1",
+        type: "url",
+        title: "相关推荐 - 模块条目",
+        posterPath: "https://picsum.photos/seed/forward-demo-related-1/600/900",
+        backdropPath: "https://picsum.photos/seed/forward-demo-related-backdrop-1/1280/720",
+        mediaType: "movie",
+        videoUrl: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+      },
+      {
+        id: 27205,
+        type: "tmdb",
+        title: "Inception",
+        mediaType: "movie",
+      },
+    ],
+    link: "demo-detail-1",
+  };
 }
