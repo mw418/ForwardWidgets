@@ -1,9 +1,9 @@
 WidgetMetadata = {
   id: "forward.bangumi",
   title: "动漫数据",
-  version: "1.0.0",
+  version: "1.2.1",
   requiredVersion: "0.0.1",
-  description: "获取时下热门动漫数据和播出日历",
+  description: "获取时下热门动漫数据、排行榜、年度新番、分类和播出日历",
   author: "Forward",
   site: "https://github.com/InchStudio/ForwardWidgets",
   modules: [
@@ -58,6 +58,50 @@ WidgetMetadata = {
       title: "近期注目",
       functionName: "trending",
       params: [
+      ],
+    },
+    {
+      id: "ranking",
+      title: "排行榜",
+      functionName: "ranking",
+      params: [
+      ],
+    },
+    {
+      id: "seasonal",
+      title: "年度新番",
+      functionName: "seasonal",
+      params: [
+      ],
+    },
+    {
+      id: "category",
+      title: "分类",
+      functionName: "category",
+      params: [
+        {
+          name: "cat",
+          title: "放送类型",
+          type: "enumeration",
+          enumOptions: [
+            {
+              title: "TV",
+              value: "tv",
+            },
+            {
+              title: "WEB",
+              value: "web",
+            },
+            {
+              title: "剧场版",
+              value: "movie",
+            },
+            {
+              title: "OVA",
+              value: "ova",
+            },
+          ],
+        },
       ],
     },
   ],
@@ -122,25 +166,29 @@ async function fetchBangumiData() {
   };
 }
 
-// 获取 Bangumi 热度数据方法
-async function fetchTrendingData() {
+// 通用：获取某个 latest 扁平列表 JSON（热度/排行榜/年度新番共用）
+async function fetchLatestList(fileName) {
   try {
-    // 首先尝试获取最新的热度数据
-    const latestUrl = "https://assets.vvebo.vip/scripts/datas/latest_bangumi_trending.json";
-    
-    console.log("正在获取最新 Bangumi 热度数据:", latestUrl);
+    const latestUrl = `https://assets.vvebo.vip/scripts/datas/${fileName}`;
+
+    console.log("正在获取最新 Bangumi 数据:", latestUrl);
     const response = await Widget.http.get(latestUrl);
-    
+
     if (response && response.data) {
-      console.log("Bangumi 热度数据获取成功 (latest_bangumi_trending.json)");
+      console.log(`Bangumi 数据获取成功 (${fileName})`);
       return response.data;
     }
   } catch (error) {
-    console.log("获取 latest_bangumi_trending.json 失败，尝试按日期获取:", error.message);
+    console.log(`获取 ${fileName} 失败:`, error.message);
   }
-  
-  // 如果所有日期都获取失败，返回空数组
+
+  // 获取失败返回空数组
   return [];
+}
+
+// 获取 Bangumi 热度数据方法
+async function fetchTrendingData() {
+  return fetchLatestList("latest_bangumi_trending.json");
 }
 
 // 获取指定日期的动画列表
@@ -184,7 +232,7 @@ function formatAnimeData(animeList) {
     const hasTmdb = !!anime.tmdb_info;
     return {
       id: anime.tmdb_info?.id || anime.bangumi_url?.split('/').pop() || Math.random().toString(36),
-      type: "bangumi",
+      type: "tmdb",
       title: anime.bangumi_name,
       description: anime.tmdb_info?.description || "",
       releaseDate: anime.tmdb_info?.releaseDate || "",
@@ -221,7 +269,7 @@ function formatTrendingData(trendingList) {
     const hasTmdb = !!anime.tmdb_info;
     return {
       id: anime.tmdb_info?.id || anime.bangumi_url?.split('/').pop() || Math.random().toString(36),
-      type: "bangumi",
+      type: "tmdb",
       title: anime.bangumi_name,
       description: anime.tmdb_info?.description || "",
       releaseDate: anime.tmdb_info?.releaseDate || "",
@@ -257,5 +305,24 @@ async function dailySchedule(params) {
 // 近期注目
 async function trending(params) {
   const data = await fetchTrendingData();
+  return formatTrendingData(data);
+}
+
+// 排行榜（Bangumi 评分总排行）
+async function ranking(params) {
+  const data = await fetchLatestList("latest_bangumi_rank.json");
+  return formatTrendingData(data);
+}
+
+// 年度新番（当年按排名）
+async function seasonal(params) {
+  const data = await fetchLatestList("latest_bangumi_seasonal.json");
+  return formatTrendingData(data);
+}
+
+// 分类（按放送类型：tv/web/movie/ova，按排名）
+async function category(params) {
+  const cat = params.cat || "tv";
+  const data = await fetchLatestList(`latest_bangumi_cat_${cat}.json`);
   return formatTrendingData(data);
 }
