@@ -213,8 +213,10 @@ Handler functions need to return an array of objects that conform to the Forward
     id: "unique_id",            // Based on the main value of different types. When type is url, it's the corresponding url. When type is douban, imdb, or tmdb, id is the corresponding id value. For tmdb id, it needs to be composed of type.id, e.g., tv.123 movie.234.
     type: "type",               // Type identifier url, douban, imdb, tmdb
     title: "title",             // Title
-    posterPath: "url",          // Vertical cover image URL
-    backdropPath: "url",        // Horizontal cover URL
+    coverUrl: "url",            // Generic fallback cover: used after backdropPath in landscape slots, last in portrait slots. Filling only this works everywhere
+    posterPath: "url",          // Vertical poster, preferred in portrait slots; also recognizes aliases posterUrl / poster_url
+    detailPoster: "url",        // Optional, dedicated poster for the detail page, overrides posterPath
+    backdropPath: "url",        // Horizontal cover, preferred in landscape slots (detail page top, horizontal lists)
     releaseDate: "date",        // Release date
     mediaType: "tv|movie",      // Media type
     rating: "5",                // Rating
@@ -255,6 +257,23 @@ Handler functions need to return an array of objects that conform to the Forward
 ```
 
 `loadList` and `loadDetail` should use the same `VideoItem` model. `loadDetail` may return only the fields needed by the detail page, but field names and structures should stay consistent.
+
+#### Image fields & display slots (important)
+
+The App picks the image field by **display slot**, with a **fallback chain**: an item only needs one or two of these fields, and missing slots fall back automatically (left to right, first non-empty value wins).
+
+| Display slot | Fallback chain |
+|---|---|
+| Detail page top image, horizontal list thumbnail (landscape slot) | `backdropPath` → `coverUrl` → `posterPath` |
+| Vertical poster wall (portrait slot, poster-style list) | `posterPath` → `backdropPath` → `coverUrl` |
+| Detail page poster slot | `detailPoster` (falls back to the portrait slot) |
+| Detail page stills carousel | `backdropPaths` (array, independent field, not part of the chains above) |
+| Trailer cover | `trailers[].coverUrl` → `coverUrl` → `backdropPath` → `posterPath` |
+
+- **`coverUrl` is the "generic fallback cover"**: filling only it shows an image in both landscape (second priority) and portrait (last priority) slots. "Detail page top has an image without `backdropPath` set" is exactly the fallback to `coverUrl`.
+- **Field aliases**: `posterPath` also recognizes `posterUrl` / `poster_url`; `backdropPaths` also recognizes `backdropImageUrls`.
+- **`tmdb` / `douban` / `imdb` types don't use these chains**: they use the built-in detail page, where images come from the corresponding platform's data; for `tmdb`, pass raw TMDB paths (e.g. `/abc.jpg`) to `posterPath`/`backdropPath`.
+- **Rule of thumb**: fill `backdropPath` for landscape slots (detail top, horizontal lists) and `posterPath` for portrait slots (posters); if you only have one image and don't want to distinguish orientation, fill `coverUrl` as the all-slot fallback.
 
 ### Best Practices
 
