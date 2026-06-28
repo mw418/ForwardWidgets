@@ -402,12 +402,13 @@ async function loadResource(params) {
     var resources = [];
     for (var i = 0; i < detail.episodeItems.length; i++) {
       var ep = detail.episodeItems[i];
-      if (ep.qualityUrls && ep.qualityUrls.length > 1) {
-        for (var q = 0; q < ep.qualityUrls.length; q++) {
+      if (ep.childItems && ep.childItems.length > 0) {
+        for (var q = 0; q < ep.childItems.length; q++) {
+          var child = ep.childItems[q];
           resources.push({
             name: 'nfyingshi',
-            description: detail.title + ' - ' + ep.title + ' - ' + (ep.qualityNames[q] || '画质' + (q + 1)),
-            url: ep.qualityUrls[q],
+            description: detail.title + ' - ' + ep.title + ' - ' + child.title,
+            url: child.videoUrl || '',
           });
         }
       } else {
@@ -662,8 +663,16 @@ async function loadDetail(link) {
         if (info && info.urls.length > 0) {
           ep.videoUrl = info.urls[info.defaultIdx] || info.urls[0];
           if (info.urls.length > 1) {
-            ep.qualityUrls = info.urls;
-            ep.qualityNames = info.names;
+            ep.childItems = [];
+            for (var q = 0; q < info.urls.length; q++) {
+              ep.childItems.push({
+                id: ep.id + ':q' + q,
+                type: 'url',
+                title: info.names[q] || ('画质' + (q + 1)),
+                videoUrl: info.urls[q],
+                link: ep.id + ':q' + q,
+              });
+            }
           }
         }
       } catch (e) {
