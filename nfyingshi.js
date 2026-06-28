@@ -4,7 +4,7 @@ WidgetMetadata = {
   version: "1.0.0",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
-  author: "Forward",
+  author: "mw99",
   site: "https://www.nfyingshi.com",
   icon: "https://www.nfyingshi.com/wp-content/uploads/2024/08/3dc9330bc1c342.png",
   detailCacheDuration: 300,
