@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.7.2",
+  version: "1.7.3",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -744,10 +744,15 @@ async function loadDetail(link) {
         var epId = 'nfep:' + postId + ':' + epVid;
         var epNum = parseInt((epTitle.match(/\d+/) || [])[0]) || 0;
         var si = extractSeasonInfo(title);
+        var si = extractSeasonInfo(title);
+        var epNum = parseInt((epTitle.match(/\d+/) || [])[0]) || 0;
         episodeItems.push({
           id: epId,
           type: 'url',
           title: epTitle,
+          description: title + ' - ' + epTitle,
+          season: si.seasonNumber,
+          episode: epNum,
           link: epId,
           videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
@@ -763,10 +768,15 @@ async function loadDetail(link) {
         var rId = 'nfep:' + postId + ':' + re.vid;
         var reNum = parseInt((re.title.match(/\d+/) || [])[0]) || 0;
         var rsi = extractSeasonInfo(title);
+        var rsi = extractSeasonInfo(title);
+        var reNum = parseInt((re.title.match(/\d+/) || [])[0]) || 0;
         episodeItems.push({
           id: rId,
           type: 'url',
           title: re.title,
+          description: title + ' - ' + re.title,
+          season: rsi.seasonNumber,
+          episode: reNum,
           link: rId,
           videoUrl: siteUrl + '/v_play/' + re.vid + '.html',
         });
