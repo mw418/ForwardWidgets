@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.5.7",
+  version: "1.5.8",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -502,7 +502,7 @@ async function loadResource(params) {
             name: '奈非影视',
             description: detail.title + ' - ' + ep.title + ' - ' + child.title,
             url: child.videoUrl || '',
-            _ep: isMovie ? null : epNum,  // VodStream-style _ep marker
+            _ep: epNum,  // VodStream-style _ep marker
           });
         }
       } else {
@@ -510,7 +510,7 @@ async function loadResource(params) {
           name: '奈非影视',
           description: detail.title + ' - ' + ep.title,
           url: ep.videoUrl || '',
-          _ep: isMovie ? null : epNum,
+          _ep: epNum,
         });
       }
     }
@@ -743,8 +743,9 @@ async function loadDetail(link) {
         var epVid = epMatch[1];
         var epId = 'nfep:' + postId + ':' + epVid;
         var epNum = parseInt((epTitle.match(/\d+/) || [])[0]) || 0;
+        var si = extractSeasonInfo(title);
         episodeItems.push({
-          id: epId, type: 'url', title: epTitle, description: title + ' - ' + epTitle, episode: epNum, link: epId,
+          id: epId, type: 'url', title: epTitle, description: title + ' - ' + epTitle, season: si.seasonNumber, episode: epNum, link: epId,
           videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
@@ -758,8 +759,9 @@ async function loadDetail(link) {
         var re = rawEps[ri];
         var rId = 'nfep:' + postId + ':' + re.vid;
         var reNum = parseInt((re.title.match(/\d+/) || [])[0]) || 0;
+        var rsi = extractSeasonInfo(title);
         episodeItems.push({
-          id: rId, type: 'url', title: re.title, description: title + ' - ' + re.title, episode: reNum, link: rId,
+          id: rId, type: 'url', title: re.title, description: title + ' - ' + re.title, season: rsi.seasonNumber, episode: reNum, link: rId,
           videoUrl: siteUrl + '/v_play/' + re.vid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + re.vid + '.html'; trailerCover = poster; }
@@ -835,6 +837,7 @@ async function loadDetail(link) {
       genreItems: genreItems,
       peoples: peoples,
       mediaType: title.indexOf('季') !== -1 ? 'tv' : 'movie',
+      season: extractSeasonInfo(title).seasonNumber,
       releaseDate: releaseDate,
       link: 'nf:' + postId,
       trailers: trailerUrl ? [{ coverUrl: trailerCover, url: trailerUrl }] : [],
