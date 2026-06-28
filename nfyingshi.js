@@ -70,6 +70,11 @@ WidgetMetadata = {
       { name: "page", title: "页码", type: "page" },
     ],
   },
+  sourceLoader: {
+    title: "解析播放源",
+    functionName: "loadSource",
+    params: [],
+  },
 };
 
 // ── Pure JS AES-128-CBC Decrypt ────────────────────────────────────
@@ -689,7 +694,6 @@ async function loadDetail(link) {
           type: 'url',
           title: epTitle,
           link: epId,
-          videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
         if (!trailerUrl) {
           trailerUrl = siteUrl + '/v_play/' + epVid + '.html';
