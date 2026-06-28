@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.4.1",
+  version: "1.4.2",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -468,7 +468,7 @@ async function loadResource(params) {
         for (var q = 0; q < ep.childItems.length; q++) {
           var child = ep.childItems[q];
           resources.push({
-            name: 'nfyingshi',
+            name: '奈非影视',
             description: detail.title + ' - ' + ep.title + ' - ' + child.title,
             url: child.videoUrl || '',
             _ep: isMovie ? null : epNum,  // VodStream-style _ep marker
@@ -476,7 +476,7 @@ async function loadResource(params) {
         }
       } else {
         resources.push({
-          name: 'nfyingshi',
+          name: '奈非影视',
           description: detail.title + ' - ' + ep.title,
           url: ep.videoUrl || '',
           _ep: isMovie ? null : epNum,
