@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.7.1",
+  version: "1.7.2",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -745,7 +745,10 @@ async function loadDetail(link) {
         var epNum = parseInt((epTitle.match(/\d+/) || [])[0]) || 0;
         var si = extractSeasonInfo(title);
         episodeItems.push({
-          id: epId, type: 'url', title: epTitle, coverUrl: poster, posterPath: poster, description: title + ' - ' + epTitle, season: si.seasonNumber, episode: epNum, playerType: 'system', link: epId,
+          id: epId,
+          type: 'url',
+          title: epTitle,
+          link: epId,
           videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
@@ -761,7 +764,10 @@ async function loadDetail(link) {
         var reNum = parseInt((re.title.match(/\d+/) || [])[0]) || 0;
         var rsi = extractSeasonInfo(title);
         episodeItems.push({
-          id: rId, type: 'url', title: epTitle, coverUrl: poster, posterPath: poster, description: title + ' - ' + re.title, season: rsi.seasonNumber, episode: reNum, playerType: 'system', link: rId,
+          id: rId,
+          type: 'url',
+          title: re.title,
+          link: rId,
           videoUrl: siteUrl + '/v_play/' + re.vid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + re.vid + '.html'; trailerCover = poster; }
