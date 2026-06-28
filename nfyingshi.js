@@ -10,6 +10,8 @@ WidgetMetadata = {
   detailCacheDuration: 300,
   globalParams: [
     { name: "server", title: "站点", type: "input", value: "https://www.nfyingshi.com" },
+    { name: "username", title: "用户名", type: "input", placeholders: [{ title: "输入会员用户名登录获取VIP资源", value: "" }] },
+    { name: "password", title: "密码", type: "input", placeholders: [{ title: "输入会员密码", value: "" }] },
   ],
   modules: [
     {
@@ -59,6 +61,11 @@ WidgetMetadata = {
       { name: "keyword", title: "关键词", type: "input" },
       { name: "page", title: "页码", type: "page" },
     ],
+  },
+  sourceLoader: {
+    title: "解析播放源",
+    functionName: "loadSource",
+    params: [],
   },
 };
 
@@ -234,6 +241,38 @@ function aesDecryptB64(base64str) {
   return aesDecrypt(bytes);
 }
 
+// ── Load video source (called by player to resolve play links) ────────────
+
+async function loadSource(link) {
+  try {
+    var parts = String(link).split(':');
+    // link format: nfep:postId:epVid
+    if (parts.length < 3 || parts[0] !== 'nfep') return null;
+    var postId = parts[1];
+    var epVid = parts[2];
+
+    var siteUrl = 'https://www.nfyingshi.com';
+    var playUrl = siteUrl + '/v_play/' + epVid + '.html';
+    var res = await Widget.http.get(playUrl, { headers: buildHeaders() });
+    var info = extractVideoInfo(res.data);
+    if (!info || !info.urls.length) return null;
+
+    if (info.urls.length === 1) {
+      return { sourceUrl: info.urls[0] };
+    }
+
+    // Multiple qualities: return all so player shows quality selector
+    return {
+      sourceUrls: info.urls,
+      sourceNames: info.names,
+      defaultSourceUrl: info.urls[info.defaultIdx] || info.urls[0],
+    };
+  } catch (e) {
+    console.error('[nfyingshi:loadSource]', e.message || e);
+    return null;
+  }
+}
+
 // ── Extract video URLs from play page ────────────────────────────────────
 
 function extractVideoInfo(html) {
@@ -288,16 +327,94 @@ function playPagePath(postId, episode) {
   return base64Encode('mv_' + postId + '-nm_' + episode);
 }
 
-// ── HTTP helpers ────────────────────────────────────
+// ── Login & Auth helpers ────────────────────────────────────
+
+var LOGIN_CACHE_KEY = '__nfy_login';
 
 function getSiteUrl(params) {
   return (params.server || 'https://www.nfyingshi.com').replace(/\/$/, '');
 }
 
+// WordPress login: POST credentials, extract session cookies
+async function loginToWP(siteUrl, username, password) {
+  try {
+    var body = 'log=' + encodeURIComponent(username) +
+               '&pwd=' + encodeURIComponent(password) +
+               '&wp-submit=' + encodeURIComponent('登录') +
+               '&redirect_to=' + encodeURIComponent('/') +
+               '&testcookie=1';
+
+    var res = await Widget.http.post(siteUrl + '/wp-login.php', body, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      allow_redirects: false,
+    });
+
+    if (res.status === 302 || res.status === 301) {
+      var cookies = [];
+      var setCookieHeaders = res.headers['set-cookie'] || res.headers['Set-Cookie'] || [];
+      if (typeof setCookieHeaders === 'string') setCookieHeaders = [setCookieHeaders];
+      for (var i = 0; i < setCookieHeaders.length; i++) {
+        var cookiePart = setCookieHeaders[i].split(';')[0];
+        if (cookiePart.indexOf('wordpress') !== -1) {
+          cookies.push(cookiePart);
+        }
+      }
+      if (cookies.length > 0) {
+        return cookies.join('; ');
+      }
+    }
+
+    console.error('[nfyingshi:login] 登录失败，请检查用户名和密码');
+    return null;
+  } catch (e) {
+    console.error('[nfyingshi:login] 登录异常:', e.message || e);
+    return null;
+  }
+}
+
+// Called by list/search handlers: checks credentials, logs in, caches
+async function performAuth(params) {
+  if (!params || !params.username || !params.password) return;
+
+  // Check cache first
+  var cached = Widget.storage.get(LOGIN_CACHE_KEY);
+  if (cached) {
+    try {
+      var obj = typeof cached === 'string' ? JSON.parse(cached) : cached;
+      var age = Date.now() - (obj.time || 0);
+      if (age < 3600000 && obj.cookie) return; // 1h cache
+    } catch (e) { /* ignore bad cache */ }
+  }
+
+  var siteUrl = getSiteUrl(params);
+  var cookie = await loginToWP(siteUrl, params.username, params.password);
+  if (cookie) {
+    Widget.storage.set(LOGIN_CACHE_KEY, JSON.stringify({ cookie: cookie, time: Date.now() }));
+  }
+}
+
+// ── HTTP helpers ────────────────────────────────────
+
 function buildHeaders() {
-  return {
+  var headers = {
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   };
+
+  // Check cached login cookie
+  var cached = Widget.storage.get(LOGIN_CACHE_KEY);
+  if (cached) {
+    try {
+      var obj = typeof cached === 'string' ? JSON.parse(cached) : cached;
+      if (obj.cookie) {
+        headers['Cookie'] = obj.cookie;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  return headers;
 }
 
 // ── Scrape movie cards from list pages ────────────────────────────────────
@@ -340,6 +457,7 @@ function parseMovieCards($, siteUrl) {
 
 async function loadHot(params) {
   try {
+    await performAuth(params);
     var siteUrl = getSiteUrl(params);
     var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders(params) });
     var $ = Widget.html.load(res.data);
@@ -355,6 +473,7 @@ async function loadHot(params) {
 
 async function loadRecent(params) {
   try {
+    await performAuth(params);
     var siteUrl = getSiteUrl(params);
     var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders(params) });
     var $ = Widget.html.load(res.data);
@@ -419,6 +538,7 @@ var CATEGORY_URLS = {
 
 async function loadCategory(params) {
   try {
+    await performAuth(params);
     var siteUrl = getSiteUrl(params);
     var path = CATEGORY_URLS[params.category] || CATEGORY_URLS['meiju'];
     var page = params.page || 1;
@@ -438,6 +558,7 @@ async function loadCategory(params) {
 
 async function search(params) {
   try {
+    await performAuth(params);
     var siteUrl = getSiteUrl(params);
     var keyword = params.keyword || '';
     var page = params.page || 1;
