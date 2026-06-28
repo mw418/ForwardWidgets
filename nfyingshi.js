@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.9.4",
+  version: "1.9.5",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -222,8 +222,15 @@ async function loadSource(link) {
       return { sourceUrl: String(link) };
     }
     var linkText = String(link || '');
-    var playMatch = linkText.match(/v_play\/([^.\/]+)\.html/);
-    if (playMatch) linkText = 'nfep:0:' + playMatch[1];
+    var siteUrl = 'https://www.nfyingshi.com';
+    var fullPlayMatch = linkText.match(/^(https?:\/\/[^\/]+).*?\/v_play\/([^.\/?#]+)\.html/i);
+    if (fullPlayMatch) {
+      siteUrl = fullPlayMatch[1].replace(/\/$/, '');
+      linkText = 'nfep:0:' + fullPlayMatch[2];
+    } else {
+      var playMatch = linkText.match(/v_play\/([^.\/?#]+)\.html/i);
+      if (playMatch) linkText = 'nfep:0:' + playMatch[1];
+    }
     var parts = linkText.split(':');
     if (parts.length < 3 || parts[0] !== 'nfep') return null;
     var postId = parts[1];
@@ -234,9 +241,8 @@ async function loadSource(link) {
       if (qualityMatch) qualityIndex = parseInt(qualityMatch[1], 10);
     }
 
-    var siteUrl = 'https://www.nfyingshi.com';
     var playUrl = siteUrl + '/v_play/' + epVid + '.html';
-    var res = await Widget.http.get(playUrl, { headers: buildHeaders() });
+    var res = await Widget.http.get(playUrl, { headers: buildHeaders(siteUrl) });
     var info = extractVideoInfo(res.data);
     if (!info || !info.urls.length) return null;
 
@@ -315,9 +321,28 @@ function base64Encode(str) {
 // ── Login & Auth helpers ────────────────────────────────────
 
 var LOGIN_CACHE_KEY = '__nfy_login';
+var LOGIN_FAILURE_TTL = 600000;
 
 function getSiteUrl(params) {
   return (params.server || 'https://www.nfyingshi.com').replace(/\/$/, '');
+}
+
+function makeDetailLink(postId, siteUrl) {
+  return 'nf:' + postId + ':' + encodeURIComponent((siteUrl || 'https://www.nfyingshi.com').replace(/\/$/, ''));
+}
+
+function parseDetailLink(link) {
+  var parts = String(link || '').split(':');
+  var postId = parts[1] || '';
+  var siteUrl = 'https://www.nfyingshi.com';
+  if (parts[2]) {
+    try {
+      siteUrl = decodeURIComponent(parts[2]).replace(/\/$/, '');
+    } catch (e) {
+      siteUrl = 'https://www.nfyingshi.com';
+    }
+  }
+  return { postId: postId, siteUrl: siteUrl };
 }
 
 // WordPress login: POST credentials, extract session cookies
@@ -368,6 +393,7 @@ function extractWordPressCookie(headers) {
 // Called by list/search handlers: checks credentials, logs in, caches
 async function performAuth(params) {
   if (!params || !params.username || !params.password) return;
+  var siteUrl = getSiteUrl(params);
 
   // Check cache first
   var cached = Widget.storage.get(LOGIN_CACHE_KEY);
@@ -375,20 +401,24 @@ async function performAuth(params) {
     try {
       var obj = typeof cached === 'string' ? JSON.parse(cached) : cached;
       var age = Date.now() - (obj.time || 0);
-      if (age < 21600000 && obj.cookie && obj.siteUrl === getSiteUrl(params) && obj.username === params.username) return; // 6h cache
+      if (obj.siteUrl === siteUrl && obj.username === params.username) {
+        if (age < 21600000 && obj.cookie) return; // 6h cache
+        if (age < LOGIN_FAILURE_TTL && obj.failed) return;
+      }
     } catch (e) { /* ignore bad cache */ }
   }
 
-  var siteUrl = getSiteUrl(params);
   var cookie = await loginToWP(siteUrl, params.username, params.password);
   if (cookie) {
     Widget.storage.set(LOGIN_CACHE_KEY, JSON.stringify({ cookie: cookie, siteUrl: siteUrl, username: params.username, time: Date.now() }));
+  } else {
+    Widget.storage.set(LOGIN_CACHE_KEY, JSON.stringify({ failed: true, siteUrl: siteUrl, username: params.username, time: Date.now() }));
   }
 }
 
 // ── HTTP helpers ────────────────────────────────────
 
-function buildHeaders() {
+function buildHeaders(siteUrl) {
   var headers = {
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   };
@@ -398,13 +428,34 @@ function buildHeaders() {
   if (cached) {
     try {
       var obj = typeof cached === 'string' ? JSON.parse(cached) : cached;
-      if (obj.cookie && Date.now() - (obj.time || 0) < 21600000) {
+      if (obj.cookie && Date.now() - (obj.time || 0) < 21600000 && (!siteUrl || obj.siteUrl === siteUrl)) {
         headers['Cookie'] = obj.cookie;
       }
     } catch (e) { /* ignore */ }
   }
 
   return headers;
+}
+
+function inferMediaType(title) {
+  var text = cleanText(title);
+  return /第\s*[零〇一二两三四五六七八九十\d]+\s*(?:季|集|期)|季|剧|真人秀|综艺/.test(text) ? 'tv' : 'movie';
+}
+
+function makeMovieItem(postId, title, poster, rating, description, siteUrl) {
+  return {
+    id: 'nf:' + postId,
+    type: 'url',
+    mediaType: inferMediaType(title),
+    title: title,
+    coverUrl: poster,
+    posterPath: poster,
+    link: makeDetailLink(postId, siteUrl),
+    rating: rating,
+    description: description || '',
+    postId: postId,
+    playerType: 'system',
+  };
 }
 
 // ── Scrape movie cards from list pages ────────────────────────────────────
@@ -428,16 +479,7 @@ function parseMovieCards($, siteUrl) {
     var castEl = $li.find('.inzhuy');
     if (castEl.length) cast = castEl.text().trim().replace(/^主演：/, '');
     if (title && postId) {
-      items.push({
-        id: 'nf:' + postId,
-        type: 'url',
-        title: title,
-        posterPath: poster,
-        link: 'nf:' + postId,
-        rating: rating,
-        description: cast ? '主演：' + cast : '',
-        postId: postId,
-      });
+      items.push(makeMovieItem(postId, title, poster, rating, cast ? '主演：' + cast : '', siteUrl));
     }
   });
   return items;
@@ -524,7 +566,7 @@ function extractDetailTitle($, html) {
 async function loadEpisodeQualities(ep) {
   try {
     if (!ep) return [];
-    var sourceKey = ep.sourceId || ep.link || ep.videoUrl;
+    var sourceKey = ep.videoUrl || ep.sourceId || ep.link;
     if (!sourceKey) return [];
     var source = await loadSource(sourceKey);
     if (source && source.sourceUrls && source.sourceUrls.length > 0) {
@@ -589,13 +631,13 @@ async function loadResource(params) {
     // Search with base name only (don't confuse search engine with season suffix)
     var searchQuery = baseName;
     var url = siteUrl + '/?s=' + encodeURIComponent(searchQuery);
-    var res = await Widget.http.get(url, { headers: buildHeaders() });
+    var res = await Widget.http.get(url, { headers: buildHeaders(siteUrl) });
     var $ = Widget.html.load(res.data);
     var cards = parseSearchCards($, siteUrl);
 
     // Fallback: homepage parsing (site search often returns None Related)
     if (!cards.length) {
-      res = await Widget.http.get(siteUrl, { headers: buildHeaders() });
+      res = await Widget.http.get(siteUrl, { headers: buildHeaders(siteUrl) });
       $ = Widget.html.load(res.data);
       cards = parseMovieCards($, siteUrl);
       if (cards.length) {
@@ -651,7 +693,7 @@ async function loadHot(params) {
   try {
     await performAuth(params);
     var siteUrl = getSiteUrl(params);
-    var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders() });
+    var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders(siteUrl) });
     var $ = Widget.html.load(res.data);
     var items = parseMovieCards($, siteUrl);
     return items.slice(0, 12);
@@ -667,7 +709,7 @@ async function loadRecent(params) {
   try {
     await performAuth(params);
     var siteUrl = getSiteUrl(params);
-    var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders() });
+    var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders(siteUrl) });
     var $ = Widget.html.load(res.data);
     var sections = $('.mi_btcon');
     if (sections.length < 2) return loadHot(params);
@@ -690,16 +732,7 @@ async function loadRecent(params) {
       var castEl = $li.find('.inzhuy');
       if (castEl.length) cast = castEl.text().trim().replace(/^主演：/, '');
       if (title && postId) {
-        items.push({
-          id: 'nf:' + postId,
-          type: 'url',
-          title: title,
-          posterPath: poster,
-          link: 'nf:' + postId,
-          rating: rating,
-          description: cast ? '主演：' + cast : '',
-          postId: postId,
-        });
+        items.push(makeMovieItem(postId, title, poster, rating, cast ? '主演：' + cast : '', siteUrl));
       }
     });
     return items;
@@ -736,7 +769,7 @@ async function loadCategory(params) {
     var page = params.page || 1;
     var url = siteUrl + path;
     if (page > 1) url += '/page/' + page;
-    var res = await Widget.http.get(url, { headers: buildHeaders() });
+    var res = await Widget.http.get(url, { headers: buildHeaders(siteUrl) });
     var $ = Widget.html.load(res.data);
     var items = parseMovieCards($, siteUrl);
     return items;
@@ -765,9 +798,16 @@ function parseSearchCards($, siteUrl) {
     var rating = $rating.length ? parseFloat($rating.first().text().trim()) || undefined : undefined;
     if (title && postId) {
       items.push({
-        id: "nf:" + postId, type: "url", title: title,
-        posterPath: poster, link: "nf:" + postId,
-        rating: rating, postId: postId,
+        id: "nf:" + postId,
+        type: "url",
+        mediaType: inferMediaType(title),
+        title: title,
+        coverUrl: poster,
+        posterPath: poster,
+        link: makeDetailLink(postId, siteUrl),
+        rating: rating,
+        postId: postId,
+        playerType: "system",
       });
     }
   });
@@ -785,7 +825,7 @@ async function search(params) {
     var page = params.page || 1;
     var url = siteUrl + '/?s=' + encodeURIComponent(keyword);
     if (page > 1) url += '&paged=' + page;
-    var res = await Widget.http.get(url, { headers: buildHeaders() });
+    var res = await Widget.http.get(url, { headers: buildHeaders(siteUrl) });
     var $ = Widget.html.load(res.data);
     var items = parseSearchCards($, siteUrl);
     return items;
@@ -799,13 +839,13 @@ async function search(params) {
 
 async function loadDetail(link) {
   try {
-    var parts = String(link).split(':');
-    var postId = parts[1];
+    var parsedLink = parseDetailLink(link);
+    var postId = parsedLink.postId;
     if (!postId) return null;
 
-    var siteUrl = 'https://www.nfyingshi.com'; // use default (no params in loadDetail)
+    var siteUrl = parsedLink.siteUrl;
     var res = await Widget.http.get(siteUrl + '/movie/' + postId + '.html', {
-      headers: buildHeaders(),
+      headers: buildHeaders(siteUrl),
     });
     var $ = Widget.html.load(res.data);
 
@@ -861,6 +901,7 @@ async function loadDetail(link) {
       var epNum = extractEpisodeNumber(epTitle, episodeItems.length + 1);
       if (!epTitle) epTitle = '第' + epNum + '集';
       var epId = 'nfep:' + postId + ':' + epVid;
+      var playUrl = siteUrl + '/v_play/' + epVid + '.html';
       var si = extractSeasonInfo(title);
       episodeItems.push({
         id: epId,
@@ -870,10 +911,10 @@ async function loadDetail(link) {
         season: si.seasonNumber,
         episode: epNum,
         sourceId: epId,
-        link: epId,
-        videoUrl: epId,
+        videoUrl: playUrl,
+        playerType: 'system',
       });
-      if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
+      if (!trailerUrl) { trailerUrl = playUrl; trailerCover = poster; }
     }
 
     $('a[href*="v_play"]').each(function () {
@@ -941,7 +982,7 @@ async function loadDetail(link) {
       mediaType: title.indexOf('季') !== -1 ? 'tv' : 'movie',
       season: extractSeasonInfo(title).seasonNumber,
       releaseDate: releaseDate,
-      link: 'nf:' + postId,
+      link: makeDetailLink(postId, siteUrl),
       playerType: 'system',
       trailers: trailerUrl ? [{ coverUrl: trailerCover, url: trailerUrl }] : [],
 };

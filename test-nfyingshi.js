@@ -114,6 +114,17 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
     ]});
     assert.equal(cookie, "wordpress_logged_in_abc=user%7C123%7Chash; wordpress_sec_abc=sec%7C123%7Chash");
   });
+  check("Cookie只用于匹配站点", () => {
+    stores[LOGIN_CACHE_KEY] = JSON.stringify({
+      cookie: "wordpress_logged_in_abc=user%7C123%7Chash",
+      siteUrl: "https://www.nfyingshi.com",
+      username: "testuser",
+      time: Date.now()
+    });
+    assert.equal(buildHeaders("https://www.nfyingshi.com").Cookie, "wordpress_logged_in_abc=user%7C123%7Chash");
+    assert.equal(buildHeaders("https://mirror.example").Cookie, undefined);
+    delete stores[LOGIN_CACHE_KEY];
+  });
 
 
   _LOG("\n=== WidgetMetadata Tests ===");
@@ -125,6 +136,20 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
   check("search配置存在", () => assert.ok(WidgetMetadata.search));
   check("search有keyword", () => assert.ok(WidgetMetadata.search.params.find(p => p.name === "keyword")));
   check("sourceLoader配置存在", () => assert.equal(WidgetMetadata.sourceLoader.functionName, "loadSource"));
+
+  _LOG("\n=== VideoItem Shape Tests ===");
+  var shapedItem = makeMovieItem("9000", "测试剧 第一季", "https://img.example/poster.jpg", 8.8, "简介", "https://www.nfyingshi.com");
+  check("列表项字段完整", () => {
+    assert.equal(shapedItem.type, "url");
+    assert.equal(shapedItem.mediaType, "tv");
+    assert.equal(shapedItem.coverUrl, "https://img.example/poster.jpg");
+    assert.equal(shapedItem.posterPath, "https://img.example/poster.jpg");
+    assert.equal(shapedItem.playerType, "system");
+  });
+  check("列表link携带站点且兼容旧link", () => {
+    assert.deepEqual(parseDetailLink(shapedItem.link), { postId: "9000", siteUrl: "https://www.nfyingshi.com" });
+    assert.deepEqual(parseDetailLink("nf:9000"), { postId: "9000", siteUrl: "https://www.nfyingshi.com" });
+  });
 
   _LOG("\n=== Handler Integration Tests ===");
   // These test that handlers call Widget.http correctly (auth headers, etc.)
@@ -149,6 +174,13 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
   calls.length = 0;
   var sItems = await search({ keyword: "test", server: "https://www.nfyingshi.com" });
   check("搜索返回数组", () => assert.ok(Array.isArray(sItems)));
+
+  _LOG("\n测试 14: 登录失败降级游客模式...");
+  calls.length = 0; Object.keys(stores).forEach(k => delete stores[k]);
+  await performAuth({ username: "baduser", password: "badpass", server: "https://www.nfyingshi.com" });
+  await performAuth({ username: "baduser", password: "badpass", server: "https://www.nfyingshi.com" });
+  check("登录失败短时间不重复请求", () => assert.equal(calls.filter(c => c.indexOf("POST:") === 0).length, 1));
+  Object.keys(stores).forEach(k => delete stores[k]);
 
   _LOG("\n=== Quality Selection Tests ===");
   var decryptedPlayer = "quality: [{url:'https://cdn.example.com/1080.m3u8', name:'1080P'},{url:\"https://cdn.example.com/720.m3u8\", name:\"720P\"}], defaultQuality: 1";
@@ -191,11 +223,19 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
   check("未指定画质时返回多画质列表", () => assert.deepEqual(multiSource.sourceNames, ["1080P", "720P"]));
   var playPageSource = await loadSource("https://www.nfyingshi.com/v_play/testvid.html");
   check("播放页URL也可走sourceLoader解析", () => assert.deepEqual(playPageSource.sourceNames, ["1080P", "720P"]));
+  calls.length = 0;
+  var mirrorSource = await loadSource("https://mirror.example/v_play/testvid.html");
+  check("播放页URL按自身站点解析", () => {
+    assert.deepEqual(mirrorSource.sourceNames, ["1080P", "720P"]);
+    assert.ok(calls.some(c => c === "GET:https://mirror.example/v_play/testvid.html"));
+  });
 
   var qDetail = await loadDetail("nf:9000");
   check("详情标题不会变成集数", () => assert.equal(qDetail.title, "测试剧"));
   check("详情只展示真实剧集不重复", () => assert.deepEqual(qDetail.episodeItems.map(x => x.title), ["第一集", "第二集"]));
-  check("详情剧集使用sourceLoader解析token", () => assert.deepEqual(qDetail.episodeItems.map(x => x.videoUrl), ["nfep:9000:testvid", "nfep:9000:testvid2"]));
+  check("详情剧集保留sourceLoader解析token", () => assert.deepEqual(qDetail.episodeItems.map(x => x.sourceId), ["nfep:9000:testvid", "nfep:9000:testvid2"]));
+  check("详情剧集videoUrl使用播放页URL", () => assert.deepEqual(qDetail.episodeItems.map(x => x.videoUrl), ["https://www.nfyingshi.com/v_play/testvid.html", "https://www.nfyingshi.com/v_play/testvid2.html"]));
+  check("详情剧集不携带详情link", () => assert.equal(qDetail.episodeItems[0].link, undefined));
   check("详情不依赖childItems展示画质", () => assert.equal(qDetail.episodeItems[0].childItems, undefined));
   check("详情描述不写默认画质", () => assert.equal(qDetail.episodeItems[0].description.indexOf("默认"), -1));
 
@@ -208,6 +248,15 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
   check("资源模块写入_ep用于当前集匹配", () => assert.deepEqual(resources.map(x => x._ep), [1, 1]));
   var resourcesEp2 = await loadResource({ seriesName: "测试剧", type: "tv", season: 1, episode: 2, server: "https://www.nfyingshi.com" });
   check("params.episode筛选第二集", () => assert.deepEqual(resourcesEp2.map(x => x._ep), [2, 2]));
+  parseSearchCards = function () {
+    return [{ id: "nf:9000", type: "url", title: "测试剧", link: makeDetailLink("9000", "https://mirror.example") }];
+  };
+  calls.length = 0;
+  var mirrorResources = await loadResource({ seriesName: "测试剧", type: "tv", season: 1, episode: 1, server: "https://mirror.example" });
+  check("资源模块按详情播放页站点解析", () => {
+    assert.deepEqual(mirrorResources.map(x => x.description), ["测试剧 - 第一集 - 1080P", "测试剧 - 第一集 - 720P"]);
+    assert.ok(calls.some(c => c === "GET:https://mirror.example/v_play/testvid.html"));
+  });
   parseSearchCards = oldParseSearchCards;
   Widget.http.get = oldGet;
 
