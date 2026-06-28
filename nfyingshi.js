@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.4.2",
+  version: "1.5.0",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -211,6 +211,37 @@ function utf8Decode(bytes) {
     else { str += String.fromCharCode(((c & 0x07) << 18) | ((bytes[i+1] & 0x3F) << 12) | ((bytes[i+2] & 0x3F) << 6) | (bytes[i+3] & 0x3F)); i += 4; }
   }
   return str;
+}
+
+
+// ── Load video source (called by Forward when user taps play) ─────────────
+
+async function loadSource(link) {
+  try {
+    var parts = String(link).split(':');
+    if (parts.length < 3 || parts[0] !== 'nfep') return null;
+    var postId = parts[1];
+    var epVid = parts[2];
+
+    var siteUrl = 'https://www.nfyingshi.com';
+    var playUrl = siteUrl + '/v_play/' + epVid + '.html';
+    var res = await Widget.http.get(playUrl, { headers: buildHeaders() });
+    var info = extractVideoInfo(res.data);
+    if (!info || !info.urls.length) return null;
+
+    if (info.urls.length === 1) {
+      return { sourceUrl: info.urls[0] };
+    }
+
+    return {
+      sourceUrls: info.urls,
+      sourceNames: info.names,
+      defaultSourceUrl: info.urls[info.defaultIdx] || info.urls[0],
+    };
+  } catch (e) {
+    console.error('[nfyingshi:loadSource]', e.message || e);
+    return null;
+  }
 }
 
 // ── Extract video URLs from play page ────────────────────────────────────
@@ -762,43 +793,6 @@ async function loadDetail(link) {
     if (yearEl.length) {
       var yearMatch = yearEl.text().match(/(\d{4})/);
       if (yearMatch) releaseDate = yearMatch[1] + '-01-01';
-    }
-
-    // Pre-resolve video URLs in parallel, build childItems for quality options
-    var epTasks = [];
-    for (var ei = 0; ei < episodeItems.length; ei++) {
-      epTasks.push((function(ep) {
-        return Widget.http.get(ep.videoUrl, { headers: buildHeaders() }).then(function(playRes) {
-          var info = extractVideoInfo(playRes.data);
-          if (info && info.urls.length > 0) {
-            var defaultUrl = info.urls[info.defaultIdx] || info.urls[0];
-            ep.childItems = [];
-            for (var q = 0; q < info.urls.length; q++) {
-              ep.childItems.push({
-                id: ep.id + ':q' + q,
-                type: 'url',
-                title: info.names[q] || ('画质' + (q + 1)),
-                posterPath: poster,
-                videoUrl: info.urls[q],
-                link: ep.id + ':q' + q,
-                description: info.names[q] || ('画质' + (q + 1)),
-              });
-            }
-            // Set default videoUrl only if single quality, else let Forward pick from childItems
-            if (info.urls.length === 1) {
-              ep.videoUrl = defaultUrl;
-            }
-          }
-        }).catch(function() { /* keep play-page URL */ });
-      })(episodeItems[ei]));
-    }
-    await Promise.all(epTasks);
-
-    // Remove parent videoUrl for episodes with childItems (Forward picks from childItems)
-    for (var ei = 0; ei < episodeItems.length; ei++) {
-      if (episodeItems[ei].childItems && episodeItems[ei].childItems.length > 0) {
-        delete episodeItems[ei].videoUrl;
-      }
     }
 
     return {
