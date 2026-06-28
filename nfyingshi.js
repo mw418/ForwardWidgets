@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.3.2",
+  version: "1.3.3",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -692,10 +692,22 @@ async function loadDetail(link) {
     var descEl = $('.dycon');
     var description = descEl.length ? descEl.text().trim() : '';
 
-    // Episode items from play links
+    // Episode items from play links (cheerio + regex fallback for JS-rendered)
     var episodeItems = [];
     var trailerUrl = null;
     var trailerCover = poster;
+
+    function extractEpisodes(html) {
+      var eps = [];
+      // Fallback: regex extract from raw HTML (handles JS-rendered links)
+      var re = /<a[^>]*href="(https?:\/\/[^"]*v_play\/([^."]+)\.html)"[^>]*>([^<]*)<\/a>/g;
+      var m;
+      while ((m = re.exec(html)) !== null) {
+        eps.push({ href: m[1], vid: m[2], title: m[3].trim() });
+      }
+      return eps;
+    }
+
     $('a[href*="v_play"]').each(function () {
       var epHref = $(this).attr('href') || '';
       var epTitle = $(this).text().trim();
@@ -704,18 +716,26 @@ async function loadDetail(link) {
         var epVid = epMatch[1];
         var epId = 'nfep:' + postId + ':' + epVid;
         episodeItems.push({
-          id: epId,
-          type: 'url',
-          title: epTitle,
-          link: epId,
+          id: epId, type: 'url', title: epTitle, link: epId,
           videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
-        if (!trailerUrl) {
-          trailerUrl = siteUrl + '/v_play/' + epVid + '.html';
-          trailerCover = poster;
-        }
+        if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
       }
     });
+
+    // Regex fallback when cheerio finds nothing
+    if (!episodeItems.length) {
+      var rawEps = extractEpisodes(res.data);
+      for (var ri = 0; ri < rawEps.length; ri++) {
+        var re = rawEps[ri];
+        var rId = 'nfep:' + postId + ':' + re.vid;
+        episodeItems.push({
+          id: rId, type: 'url', title: re.title, link: rId,
+          videoUrl: siteUrl + '/v_play/' + re.vid + '.html',
+        });
+        if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + re.vid + '.html'; trailerCover = poster; }
+      }
+    }
 
     // Genres
     var genreItems = [];
