@@ -382,16 +382,47 @@ function parseMovieCards($, siteUrl) {
 
 // ── Handler: Resource (stream type) ────────────────────────────────────
 
+// Chinese number to digit for season matching
+var CN_NUM = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
+
+function extractBaseName(name) {
+  var m = name.match(/第([一二三四五六七八九十\d]+)[季部]/);
+  if (m) {
+    var num = CN_NUM[m[1]] || parseInt(m[1]) || 1;
+    return { baseName: name.replace(/第[一二三四五六七八九十\d]+[季部]/, '').trim(), season: num };
+  }
+  return { baseName: name.trim(), season: null };
+}
+
 async function loadResource(params) {
   try {
     var seriesName = params.seriesName;
+    var season = params.season;
+    var episode = params.episode;
     if (!seriesName) return [];
 
     var siteUrl = getSiteUrl(params);
-    var url = siteUrl + '/?s=' + encodeURIComponent(seriesName);
+    var _b = extractBaseName(seriesName);
+    var baseName = _b.baseName;
+    var targetSeason = season ? parseInt(season) : (_b.season || null);
+
+    // Build search query: if season known, add it
+    var searchQuery = baseName;
+    if (targetSeason) searchQuery += ' 第' + targetSeason + '季';
+
+    var url = siteUrl + '/?s=' + encodeURIComponent(searchQuery);
     var res = await Widget.http.get(url, { headers: buildHeaders() });
     var $ = Widget.html.load(res.data);
     var cards = parseMovieCards($, siteUrl);
+    if (!cards.length) return [];
+
+    // Filter by season if needed
+    if (targetSeason) {
+      cards = cards.filter(function(card) {
+        var si = extractBaseName(card.title);
+        return si.season === targetSeason;
+      });
+    }
     if (!cards.length) return [];
 
     // Take the best match and resolve episode video URLs
@@ -402,6 +433,11 @@ async function loadResource(params) {
     var resources = [];
     for (var i = 0; i < detail.episodeItems.length; i++) {
       var ep = detail.episodeItems[i];
+      // If episode filter is set, skip non-matching
+      if (episode) {
+        var epNum = parseInt((ep.title.match(/\d+/) || [])[0]);
+        if (epNum && epNum !== parseInt(episode)) continue;
+      }
       if (ep.childItems && ep.childItems.length > 0) {
         for (var q = 0; q < ep.childItems.length; q++) {
           var child = ep.childItems[q];
@@ -425,7 +461,6 @@ async function loadResource(params) {
     return [];
   }
 }
-
 // ── Handler: Hot Movies ────────────────────────────────────
 
 async function loadHot(params) {
