@@ -397,10 +397,21 @@ function toCNSeason(n) {
 }
 
 function extractBaseName(name) {
-  var m = name.match(/第([一二三四五六七八九十\d]+)[季部]/);
+  // "第X季"/"第X部" with optional spaces
+  var m = name.match(/第\s*([一二三四五六七八九十\d]+)\s*[季部]/);
   if (m) {
     var num = CN_NUM[m[1]] || parseInt(m[1]) || 1;
-    return { baseName: name.replace(/第[一二三四五六七八九十\d]+[季部]/, '').trim(), season: num };
+    return { baseName: name.replace(/第\s*[一二三四五六七八九十\d]+\s*[季部]/, '').trim(), season: num };
+  }
+  // "黑袍纠察队4", "黑袍纠察队 4" — number at end, 1-2 digits
+  m = name.match(/^(.+?)\s*(\d{1,2})\s*$/);
+  if (m) {
+    return { baseName: m[1].trim(), season: parseInt(m[2]) };
+  }
+  // "Season X"
+  m = name.match(/^(.+?)\s*[Ss]eason\s*(\d+)\s*$/);
+  if (m) {
+    return { baseName: m[1].trim(), season: parseInt(m[2]) };
   }
   return { baseName: name.trim(), season: null };
 }
