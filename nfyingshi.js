@@ -10,7 +10,6 @@ WidgetMetadata = {
   detailCacheDuration: 300,
   globalParams: [
     { name: "server", title: "站点", type: "input", value: "https://www.nfyingshi.com" },
-    { name: "cookie", title: "Cookie(会员)", type: "input", placeholders: [{ title: "填入wordpress_logged_in cookie获取VIP权限", value: "" }] },
   ],
   modules: [
     {
@@ -295,12 +294,10 @@ function getSiteUrl(params) {
   return (params.server || 'https://www.nfyingshi.com').replace(/\/$/, '');
 }
 
-function buildHeaders(params) {
-  var headers = {
+function buildHeaders() {
+  return {
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   };
-  if (params && params.cookie) headers['Cookie'] = params.cookie;
-  return headers;
 }
 
 // ── Scrape movie cards from list pages ────────────────────────────────────
