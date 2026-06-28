@@ -10,8 +10,8 @@ WidgetMetadata = {
   detailCacheDuration: 300,
   globalParams: [
     { name: "server", title: "站点", type: "input", value: "https://www.nfyingshi.com" },
-    { name: "username", title: "用户名", type: "input", placeholders: [{ title: "输入会员用户名登录获取VIP资源", value: "" }] },
-    { name: "password", title: "密码", type: "input", placeholders: [{ title: "输入会员密码", value: "" }] },
+    { name: "username", title: "用户名", type: "input" },
+    { name: "password", title: "密码", type: "input" },
   ],
   modules: [
     {
