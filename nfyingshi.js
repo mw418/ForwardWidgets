@@ -613,6 +613,7 @@ async function loadDetail(link) {
           type: 'url',
           title: epTitle,
           link: epId,
+          videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
         if (!trailerUrl) {
           trailerUrl = siteUrl + '/v_play/' + epVid + '.html';
@@ -650,6 +651,24 @@ async function loadDetail(link) {
     if (yearEl.length) {
       var yearMatch = yearEl.text().match(/(\d{4})/);
       if (yearMatch) releaseDate = yearMatch[1] + '-01-01';
+    }
+
+    // Pre-resolve video URLs from play pages (AES decrypt)
+    for (var ei = 0; ei < episodeItems.length; ei++) {
+      var ep = episodeItems[ei];
+      try {
+        var playRes = await Widget.http.get(ep.videoUrl, { headers: buildHeaders() });
+        var info = extractVideoInfo(playRes.data);
+        if (info && info.urls.length > 0) {
+          ep.videoUrl = info.urls[info.defaultIdx] || info.urls[0];
+          if (info.urls.length > 1) {
+            ep.qualityUrls = info.urls;
+            ep.qualityNames = info.names;
+          }
+        }
+      } catch (e) {
+        // Keep play-page URL as fallback
+      }
     }
 
     return {
