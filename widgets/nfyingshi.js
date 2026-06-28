@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.5.5",
+  version: "1.5.6",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -743,7 +743,7 @@ async function loadDetail(link) {
         var epVid = epMatch[1];
         var epId = 'nfep:' + postId + ':' + epVid;
         episodeItems.push({
-          id: epId, type: 'url', title: epTitle, link: epId,
+          id: epId, type: 'url', title: epTitle, description: title + ' - ' + epTitle, link: epId,
           videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
@@ -757,7 +757,7 @@ async function loadDetail(link) {
         var re = rawEps[ri];
         var rId = 'nfep:' + postId + ':' + re.vid;
         episodeItems.push({
-          id: rId, type: 'url', title: re.title, link: rId,
+          id: rId, type: 'url', title: re.title, description: title + ' - ' + re.title, link: rId,
           videoUrl: siteUrl + '/v_play/' + re.vid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + re.vid + '.html'; trailerCover = poster; }
