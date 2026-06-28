@@ -161,9 +161,15 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
   Widget.http.get = async (url, opts) => {
     calls.push("GET:" + url);
     if (url.indexOf("/movie/9000.html") !== -1) {
-      return { data: '<a href="https://www.nfyingshi.com/v_play/testvid.html">第1集</a>', status: 200 };
+      return {
+        data: '<html><head><meta property="og:title" content="测试剧 第八集 - 奈菲影视"></head><body>' +
+          '<a href="https://www.nfyingshi.com/v_play/testvid.html">第一集</a>' +
+          '<a href="https://www.nfyingshi.com/v_play/testvid2.html">第二集</a>' +
+          '</body></html>',
+        status: 200
+      };
     }
-    if (url.indexOf("/v_play/testvid.html") !== -1) {
+    if (url.indexOf("/v_play/testvid.html") !== -1 || url.indexOf("/v_play/testvid2.html") !== -1) {
       return { data: fakeEncryptedHtml, status: 200 };
     }
     return oldGet(url, opts);
@@ -176,9 +182,21 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
   check("未指定画质时返回多画质列表", () => assert.deepEqual(multiSource.sourceNames, ["1080P", "720P"]));
 
   var qDetail = await loadDetail("nf:9000");
-  check("详情每集保留父级集数", () => assert.equal(qDetail.episodeItems.length, 1));
-  check("详情每集展示全部画质子项", () => assert.deepEqual(qDetail.episodeItems[0].childItems.map(x => x.title), ["1080P", "720P"]));
-  check("父级默认播放使用defaultQuality", () => assert.equal(qDetail.episodeItems[0].videoUrl, "https://cdn.example.com/720.m3u8"));
+  check("详情标题不会变成集数", () => assert.equal(qDetail.title, "测试剧"));
+  check("详情只展示真实剧集", () => assert.equal(qDetail.episodeItems.length, 2));
+  check("详情不把画质塞进childItems", () => assert.equal(qDetail.episodeItems[0].childItems, undefined));
+  check("详情描述不写默认画质", () => assert.equal(qDetail.episodeItems[0].description.indexOf("默认"), -1));
+
+  var oldParseSearchCards = parseSearchCards;
+  parseSearchCards = function () {
+    return [{ id: "nf:9000", type: "url", title: "测试剧", link: "nf:9000" }];
+  };
+  var resources = await loadResource({ seriesName: "测试剧", type: "tv", season: 1, episode: 1, server: "https://www.nfyingshi.com" });
+  check("资源模块只返回当前集全部画质", () => assert.deepEqual(resources.map(x => x.description), ["测试剧 - 第一集 - 1080P", "测试剧 - 第一集 - 720P"]));
+  check("资源模块写入_ep用于当前集匹配", () => assert.deepEqual(resources.map(x => x._ep), [1, 1]));
+  var resourcesEp2 = await loadResource({ seriesName: "测试剧", type: "tv", season: 1, episode: 2, server: "https://www.nfyingshi.com" });
+  check("params.episode筛选第二集", () => assert.deepEqual(resourcesEp2.map(x => x._ep), [2, 2]));
+  parseSearchCards = oldParseSearchCards;
   Widget.http.get = oldGet;
 
   _LOG("\n" + "=".repeat(40));

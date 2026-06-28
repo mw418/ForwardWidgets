@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.9.0",
+  version: "1.9.1",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -435,7 +435,99 @@ function parseMovieCards($, siteUrl) {
 // ── Handler: Resource (stream type) ────────────────────────────────────
 
 // Chinese number to digit for season matching
-var CN_NUM = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
+var CN_NUM = { '零':0,'〇':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
+
+function cleanText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function parseCnNumber(value) {
+  var raw = cleanText(value);
+  if (!raw) return null;
+  if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+  if (raw.indexOf('十') !== -1) {
+    var parts = raw.split('十');
+    var tens = parts[0] ? CN_NUM[parts[0]] : 1;
+    var ones = parts[1] ? CN_NUM[parts[1]] : 0;
+    if (typeof tens === 'number' && typeof ones === 'number') return tens * 10 + ones;
+  }
+  return typeof CN_NUM[raw] === 'number' ? CN_NUM[raw] : null;
+}
+
+function extractEpisodeNumber(title, fallback) {
+  var text = cleanText(title);
+  var m = text.match(/第\s*([零〇一二两三四五六七八九十\d]+)\s*(?:集|话|期|回|章)?/);
+  if (!m) m = text.match(/(?:^|\s)(?:EP|E)\s*0*(\d{1,4})(?:\D|$)/i);
+  if (!m) m = text.match(/(?:^|\D)(\d{1,4})(?:\D|$)/);
+  if (m) {
+    var n = parseCnNumber(m[1]);
+    if (n !== null && !isNaN(n)) return n;
+  }
+  return fallback || null;
+}
+
+function isEpisodeOnlyTitle(title) {
+  var text = cleanText(title);
+  return /^第\s*[零〇一二两三四五六七八九十\d]+\s*(?:集|话|期|回|章)$/.test(text) || /^(?:EP|E)?\s*\d{1,4}$/i.test(text);
+}
+
+function normalizeDetailTitle(value) {
+  var title = cleanText(value)
+    .replace(/&amp;/g, '&')
+    .replace(/\s*[-_|—]\s*奈菲影视.*$/i, '')
+    .replace(/\s*[-_|—]\s*NF.*$/i, '')
+    .replace(/\s*在线观看.*$/i, '')
+    .replace(/\s*全集.*$/i, '')
+    .replace(/\s*第\s*[零〇一二两三四五六七八九十\d]+\s*(?:集|话|期|回|章)\s*$/i, '')
+    .trim();
+  return title;
+}
+
+function extractDetailTitle($, html) {
+  var candidates = [];
+  var metaSelectors = ['meta[property="og:title"]', 'meta[name="twitter:title"]', 'meta[name="title"]'];
+  for (var i = 0; i < metaSelectors.length; i++) {
+    var $meta = $(metaSelectors[i]);
+    if ($meta.length) candidates.push($meta.attr('content') || '');
+  }
+  $('.dy_tit_big, h1.entry-title, h1').each(function () {
+    var $el = $(this);
+    var clone = $el.clone();
+    clone.find('var, span').remove();
+    candidates.push(clone.text());
+  });
+  var pageTitle = $('title').text();
+  if (pageTitle) candidates.push(pageTitle);
+  var titleMatch = String(html || '').match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (titleMatch) candidates.push(titleMatch[1]);
+  var metaMatch = String(html || '').match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
+  if (metaMatch) candidates.push(metaMatch[1]);
+
+  for (var ci = 0; ci < candidates.length; ci++) {
+    var candidate = normalizeDetailTitle(candidates[ci]);
+    if (candidate && !isEpisodeOnlyTitle(candidate)) return candidate;
+  }
+  return normalizeDetailTitle(candidates[0] || '');
+}
+
+async function loadEpisodeQualities(ep) {
+  try {
+    if (!ep || !ep.videoUrl) return [];
+    var res = await Widget.http.get(ep.videoUrl, { headers: buildHeaders() });
+    var info = extractVideoInfo(res.data);
+    if (info && info.urls.length > 0) {
+      var list = [];
+      for (var i = 0; i < info.urls.length; i++) {
+        list.push({ url: info.urls[i], name: info.names[i] || ('画质' + (i + 1)) });
+      }
+      return list;
+    }
+  } catch (e) {
+    console.log('[nfyingshi:qualities] 解析失败:', e.message || e);
+  }
+  return ep && ep.videoUrl ? [{ url: ep.videoUrl, name: '播放源' }] : [];
+}
+
 function extractSeasonInfo(seriesName) {
   if (!seriesName) return { baseName: seriesName, seasonNumber: 1 };
   // "第X季"/"第X部"
@@ -500,31 +592,22 @@ async function loadResource(params) {
     if (!detail || !detail.episodeItems || !detail.episodeItems.length) return [];
 
     var resources = [];
+    var targetEpisode = (!isMovie && episode !== undefined && episode !== null && String(episode) !== '') ? parseInt(episode, 10) : null;
     for (var i = 0; i < detail.episodeItems.length; i++) {
       var ep = detail.episodeItems[i];
-      // Extract episode number for _ep tagging (like VodStream)
-      var epMatch = ep.title.match(/第\s*([一二三四五六七八九十\d]+)\s*集?/);
-      if (!epMatch) epMatch = ep.title.match(/(\d+)/);
-      var epNum = epMatch ? (CN_NUM[epMatch[1]] || parseInt(epMatch[1]) || null) : null;
-      // TV: filter by episode if specified (like VodStream)
-      if (!isMovie && episode && epNum && epNum !== parseInt(episode)) continue;
-      if (ep.childItems && ep.childItems.length > 0) {
-        for (var q = 0; q < ep.childItems.length; q++) {
-          var child = ep.childItems[q];
-          resources.push({
-            name: '奈非影视',
-            description: detail.title + ' - ' + ep.title + ' - ' + child.title,
-            url: child.videoUrl || '',
-            _ep: epNum,  // VodStream-style _ep marker
-          });
-        }
-      } else {
-        resources.push({
-          name: '奈非影视',
-          description: detail.title + ' - ' + ep.title,
-          url: ep.videoUrl || '',
-          _ep: epNum,
-        });
+      var epNum = ep.episode || extractEpisodeNumber(ep.title, i + 1);
+      if (!isMovie && targetEpisode !== null && epNum !== targetEpisode) continue;
+
+      var qualities = await loadEpisodeQualities(ep);
+      for (var q = 0; q < qualities.length; q++) {
+        if (!qualities[q].url) continue;
+        var item = {
+          name: '奈菲影视 ' + qualities[q].name,
+          description: detail.title + ' - ' + ep.title + ' - ' + qualities[q].name,
+          url: qualities[q].url,
+        };
+        if (epNum !== null) item._ep = epNum;
+        resources.push(item);
       }
     }
     return resources;
@@ -698,13 +781,7 @@ async function loadDetail(link) {
     var $ = Widget.html.load(res.data);
 
     // Title
-    var titleEl = $('.dy_tit_big');
-    var title = '';
-    if (titleEl.length) {
-      var clone = titleEl.clone();
-      clone.find('var, span').remove();
-      title = clone.text().trim();
-    }
+    var title = extractDetailTitle($, res.data);
 
     // Rating
     var ratingEl = $('.rating');
@@ -747,27 +824,34 @@ async function loadDetail(link) {
       }
       return eps;
     }
+    var seenEpisodeMap = {};
+    function pushEpisode(epVid, epTitle) {
+      if (!epVid || seenEpisodeMap[epVid]) return;
+      seenEpisodeMap[epVid] = true;
+      epTitle = cleanText(String(epTitle || '').replace(/vip/gi, ''));
+      var epNum = extractEpisodeNumber(epTitle, episodeItems.length + 1);
+      if (!epTitle) epTitle = '第' + epNum + '集';
+      var epId = 'nfep:' + postId + ':' + epVid;
+      var si = extractSeasonInfo(title);
+      episodeItems.push({
+        id: epId,
+        type: 'url',
+        title: epTitle,
+        description: title ? title + ' - ' + epTitle : epTitle,
+        season: si.seasonNumber,
+        episode: epNum,
+        link: epId,
+        videoUrl: siteUrl + '/v_play/' + epVid + '.html',
+      });
+      if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
+    }
 
     $('a[href*="v_play"]').each(function () {
       var epHref = $(this).attr('href') || '';
-      var epTitle = $(this).text().trim().replace(/vip/gi, '').trim();
+      var epTitle = $(this).text();
       var epMatch = epHref.match(/v_play\/([^.]+)\.html/);
       if (epMatch) {
-        var epVid = epMatch[1];
-        var epId = 'nfep:' + postId + ':' + epVid;
-        var si = extractSeasonInfo(title);
-        var epNum = parseInt((epTitle.match(/\d+/) || [])[0]) || 0;
-        episodeItems.push({
-          id: epId,
-          type: 'url',
-          title: epTitle,
-          description: title + ' - ' + epTitle,
-          season: si.seasonNumber,
-          episode: epNum,
-          link: epId,
-          videoUrl: siteUrl + '/v_play/' + epVid + '.html',
-        });
-        if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
+        pushEpisode(epMatch[1], epTitle);
       }
     });
 
@@ -776,20 +860,7 @@ async function loadDetail(link) {
       var rawEps = extractEpisodes(res.data);
       for (var ri = 0; ri < rawEps.length; ri++) {
         var re = rawEps[ri];
-        var rId = 'nfep:' + postId + ':' + re.vid;
-        var rsi = extractSeasonInfo(title);
-        var reNum = parseInt((re.title.match(/\d+/) || [])[0]) || 0;
-        episodeItems.push({
-          id: rId,
-          type: 'url',
-          title: re.title,
-          description: title + ' - ' + re.title,
-          season: rsi.seasonNumber,
-          episode: reNum,
-          link: rId,
-          videoUrl: siteUrl + '/v_play/' + re.vid + '.html',
-        });
-        if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + re.vid + '.html'; trailerCover = poster; }
+        pushEpisode(re.vid, re.title);
       }
     }
 
@@ -823,51 +894,6 @@ async function loadDetail(link) {
       var yearMatch = yearEl.text().match(/(\d{4})/);
       if (yearMatch) releaseDate = yearMatch[1] + '-01-01';
     }
-
-    // Pre-resolve all video URLs, then expand to flat items (VodStream style)
-    var epTasks = [];
-    for (var ei = 0; ei < episodeItems.length; ei++) {
-      epTasks.push((function(ep) {
-        return Widget.http.get(ep.videoUrl, { headers: buildHeaders() }).then(function(playRes) {
-          var info = extractVideoInfo(playRes.data);
-          if (info && info.urls.length > 0) {
-            ep._q = [];
-            ep._defaultIdx = info.defaultIdx || 0;
-            for (var q = 0; q < info.urls.length; q++) {
-              ep._q.push({ u: info.urls[q], n: info.names[q] || '画质' + (q + 1) });
-            }
-          }
-        }).catch(function() { });
-      })(episodeItems[ei]));
-    }
-    await Promise.all(epTasks);
-
-    var si = extractSeasonInfo(title);
-    for (var ei = 0; ei < episodeItems.length; ei++) {
-      var ep = episodeItems[ei];
-      var epNum = ep.episode || parseInt((ep.title.match(/\d+/) || [])[0]) || 0;
-      if (ep._q && ep._q.length > 0) {
-        var defaultQ = ep._q[ep._defaultIdx] || ep._q[0];
-        ep.videoUrl = defaultQ.u;
-        ep.description = title + ' - ' + ep.title + ' - 默认' + defaultQ.n;
-        ep.childItems = [];
-        for (var q = 0; q < ep._q.length; q++) {
-          ep.childItems.push({
-            id: ep.id + ':q' + q, type: 'url',
-            title: ep._q[q].n,
-            videoUrl: ep._q[q].u,
-            description: title + ' - ' + ep.title + ' - ' + ep._q[q].n,
-            season: si.seasonNumber, episode: epNum,
-            link: ep.id + ':q' + q,
-            playerType: 'system',
-          });
-        }
-        delete ep._q;
-        delete ep._defaultIdx;
-      }
-    }
-
-
 
     return {
       id: 'nf:' + postId,
