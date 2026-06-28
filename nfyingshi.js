@@ -729,25 +729,6 @@ async function loadDetail(link) {
       if (yearMatch) releaseDate = yearMatch[1] + '-01-01';
     }
 
-    // Pre-resolve video URLs from play pages
-    for (var ei = 0; ei < episodeItems.length; ei++) {
-      var ep = episodeItems[ei];
-      try {
-        var playRes = await Widget.http.get(ep.videoUrl, { headers: buildHeaders() });
-        var info = extractVideoInfo(playRes.data);
-        if (info && info.urls.length > 0) {
-          ep.videoUrl = info.urls[info.defaultIdx] || info.urls[0];
-          // Expose all quality options for Forward player
-          if (info.urls.length > 1) {
-            ep.qualityUrls = info.urls;
-            ep.qualityNames = info.names;
-          }
-        }
-      } catch (e) {
-        // Keep play-page URL as fallback
-      }
-    }
-
     return {
       id: 'nf:' + postId,
       type: 'url',
