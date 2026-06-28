@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.3.5",
+  version: "1.3.6",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -294,10 +294,10 @@ async function loginToWP(siteUrl, username, password) {
       }
     }
 
-    console.error('[nfyingshi:login] 登录失败，请检查用户名和密码');
+    console.log('[nfyingshi:login] 登录未成功, 降级游客模式');
     return null;
   } catch (e) {
-    console.error('[nfyingshi:login] 登录异常:', e.message || e);
+    console.log('[nfyingshi:login] 登录异常, 降级游客模式:', e.message || e);
     return null;
   }
 }
