@@ -4,13 +4,49 @@
   "icon": "https://assets.vvebo.vip/scripts/icon.png",
   "widgets": [
     {
-      "id": "forward.tmdb",
-      "title": "TMDB",
-      "description": "获取 TMDB 的榜单数据",
+      "id": "forward.bangumi",
+      "title": "动漫数据",
+      "description": "获取时下热门动漫数据、排行榜、年度新番、分类和播出日历",
       "requiredVersion": "0.0.1",
-      "version": "1.0.5",
+      "version": "1.2.1",
       "author": "Forward",
-      "url": "https://assets.vvebo.vip/scripts/tmdb.js"
+      "url": "https://assets.vvebo.vip/scripts/bangumi.js"
+    },
+    {
+      "id": "forward.danmu",
+      "title": "自定义弹幕",
+      "description": "从指定服务器获取弹幕",
+      "requiredVersion": "0.0.2",
+      "version": "1.0.2",
+      "author": "Forward",
+      "url": "https://assets.vvebo.vip/scripts/danmu.js"
+    },
+    {
+      "id": "forward.meta.demo",
+      "title": "DEMO",
+      "description": "演示模块",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.0",
+      "author": "Forward",
+      "url": "https://assets.vvebo.vip/scripts/demo.js"
+    },
+    {
+      "id": "forward.nlsearch",
+      "title": "AI 搜索",
+      "description": "用自然语言描述你想看的内容，AI 理解意图后搜索匹配结果。每日有使用次数限制，Pro 用户可享受更高额度",
+      "requiredVersion": "0.0.1",
+      "version": "1.1.0",
+      "author": "Forward",
+      "url": "https://assets.vvebo.vip/scripts/nlsearch.js"
+    },
+    {
+      "id": "forward.danmu.example",
+      "title": "自定义弹幕示例",
+      "description": "从指定服务器获取弹幕示例",
+      "requiredVersion": "0.0.2",
+      "version": "1.0.0",
+      "author": "Forward",
+      "url": "https://assets.vvebo.vip/scripts/segmentDanmuExample.js"
     },
     {
       "id": "forward.trendingmedia",
@@ -20,33 +56,6 @@
       "version": "1.0.0",
       "author": "Forward",
       "url": "https://assets.vvebo.vip/scripts/trendingmedia.js"
-    },
-    {
-      "id": "forward.bangumi",
-      "title": "动漫数据",
-      "description": "获取时下热门动漫数据和播出日历",
-      "requiredVersion": "0.0.1",
-      "version": "1.0.0",
-      "author": "Forward",
-      "url": "https://assets.vvebo.vip/scripts/bangumi.js"
-    },
-    {
-      "id": "forward.danmu",
-      "title": "自定义弹幕",
-      "description": "全局参数支持多个自定义服务器，以换行分割。",
-      "requiredVersion": "0.0.2",
-      "version": "1.1.6",
-      "author": "Forward",
-      "url": "https://assets.vvebo.vip/scripts/danmu.js"
-    },
-    {
-      "id": "forward.nlsearch",
-      "title": "AI 搜索",
-      "description": "用自然语言描述你想看的内容，AI 理解意图后搜索匹配结果",
-      "requiredVersion": "0.0.2",
-      "version": "1.0.0",
-      "author": "Forward",
-      "url": "https://assets.vvebo.vip/scripts/nlsearch.js"
     }
   ]
 }
