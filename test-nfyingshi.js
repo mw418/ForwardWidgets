@@ -107,6 +107,13 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
     assert.ok(!h.Cookie);
     assert.ok(h['User-Agent'].indexOf('Mozilla') !== -1);
   });
+  check("可从200或302响应提取WordPress Cookie", () => {
+    var cookie = extractWordPressCookie({ "Set-Cookie": [
+      "wordpress_logged_in_abc=user%7C123%7Chash; path=/; secure",
+      "wordpress_sec_abc=sec%7C123%7Chash; path=/; secure"
+    ]});
+    assert.equal(cookie, "wordpress_logged_in_abc=user%7C123%7Chash; wordpress_sec_abc=sec%7C123%7Chash");
+  });
 
 
   _LOG("\n=== WidgetMetadata Tests ===");
@@ -182,12 +189,14 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
 
   var multiSource = await loadSource("nfep:9000:testvid");
   check("未指定画质时返回多画质列表", () => assert.deepEqual(multiSource.sourceNames, ["1080P", "720P"]));
+  var playPageSource = await loadSource("https://www.nfyingshi.com/v_play/testvid.html");
+  check("播放页URL也可走sourceLoader解析", () => assert.deepEqual(playPageSource.sourceNames, ["1080P", "720P"]));
 
   var qDetail = await loadDetail("nf:9000");
   check("详情标题不会变成集数", () => assert.equal(qDetail.title, "测试剧"));
-  check("详情展示每集全部画质条目", () => assert.deepEqual(qDetail.episodeItems.map(x => x.title), ["第一集 · 720P", "第一集 · 1080P", "第二集 · 720P", "第二集 · 1080P"]));
-  check("详情画质条目使用直链播放", () => assert.deepEqual(qDetail.episodeItems.slice(0, 2).map(x => x.videoUrl), ["https://cdn.example.com/720.m3u8", "https://cdn.example.com/1080.m3u8"]));
-  check("详情画质条目不再依赖childItems", () => assert.equal(qDetail.episodeItems[0].childItems, undefined));
+  check("详情只展示真实剧集不重复", () => assert.deepEqual(qDetail.episodeItems.map(x => x.title), ["第一集", "第二集"]));
+  check("详情剧集使用sourceLoader解析token", () => assert.deepEqual(qDetail.episodeItems.map(x => x.videoUrl), ["nfep:9000:testvid", "nfep:9000:testvid2"]));
+  check("详情不依赖childItems展示画质", () => assert.equal(qDetail.episodeItems[0].childItems, undefined));
   check("详情描述不写默认画质", () => assert.equal(qDetail.episodeItems[0].description.indexOf("默认"), -1));
 
   var oldParseSearchCards = parseSearchCards;
@@ -195,7 +204,7 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
     return [{ id: "nf:9000", type: "url", title: "测试剧", link: "nf:9000" }];
   };
   var resources = await loadResource({ seriesName: "测试剧", type: "tv", season: 1, episode: 1, server: "https://www.nfyingshi.com" });
-  check("资源模块只返回当前集全部画质", () => assert.deepEqual(resources.map(x => x.description), ["测试剧 - 第一集 - 720P", "测试剧 - 第一集 - 1080P"]));
+  check("资源模块只返回当前集全部画质", () => assert.deepEqual(resources.map(x => x.description), ["测试剧 - 第一集 - 1080P", "测试剧 - 第一集 - 720P"]));
   check("资源模块写入_ep用于当前集匹配", () => assert.deepEqual(resources.map(x => x._ep), [1, 1]));
   var resourcesEp2 = await loadResource({ seriesName: "测试剧", type: "tv", season: 1, episode: 2, server: "https://www.nfyingshi.com" });
   check("params.episode筛选第二集", () => assert.deepEqual(resourcesEp2.map(x => x._ep), [2, 2]));

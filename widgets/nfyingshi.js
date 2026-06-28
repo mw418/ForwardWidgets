@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.9.3",
+  version: "1.9.4",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -221,7 +221,10 @@ async function loadSource(link) {
     if (/^https?:\/\/.+\.(m3u8|mp4)(?:\?|#|$)/i.test(String(link))) {
       return { sourceUrl: String(link) };
     }
-    var parts = String(link).split(':');
+    var linkText = String(link || '');
+    var playMatch = linkText.match(/v_play\/([^.\/]+)\.html/);
+    if (playMatch) linkText = 'nfep:0:' + playMatch[1];
+    var parts = linkText.split(':');
     if (parts.length < 3 || parts[0] !== 'nfep') return null;
     var postId = parts[1];
     var epVid = parts[2];
@@ -330,23 +333,15 @@ async function loginToWP(siteUrl, username, password) {
       headers: {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Cookie': 'wordpress_test_cookie=WP Cookie check',
+        'Referer': siteUrl + '/wp-login.php',
       },
       allow_redirects: false,
     });
 
-    if (res.status === 302 || res.status === 301) {
-      var cookies = [];
-      var setCookieHeaders = res.headers['set-cookie'] || res.headers['Set-Cookie'] || [];
-      if (typeof setCookieHeaders === 'string') setCookieHeaders = [setCookieHeaders];
-      for (var i = 0; i < setCookieHeaders.length; i++) {
-        var cookiePart = setCookieHeaders[i].split(';')[0];
-        if (cookiePart.indexOf('wordpress') !== -1) {
-          cookies.push(cookiePart);
-        }
-      }
-      if (cookies.length > 0) {
-        return cookies.join('; ');
-      }
+    var cookie = extractWordPressCookie(res.headers || {});
+    if (cookie) {
+      return cookie;
     }
 
     console.log('[nfyingshi:login] 登录未成功, 降级游客模式');
@@ -355,6 +350,19 @@ async function loginToWP(siteUrl, username, password) {
     console.log('[nfyingshi:login] 登录异常, 降级游客模式:', e.message || e);
     return null;
   }
+}
+
+function extractWordPressCookie(headers) {
+  var setCookieHeaders = headers['set-cookie'] || headers['Set-Cookie'] || headers['SET-COOKIE'] || [];
+  if (typeof setCookieHeaders === 'string') setCookieHeaders = [setCookieHeaders];
+  var cookies = [];
+  for (var i = 0; i < setCookieHeaders.length; i++) {
+    var cookiePart = String(setCookieHeaders[i]).split(';')[0];
+    if (cookiePart.indexOf('wordpress') !== -1) {
+      cookies.push(cookiePart);
+    }
+  }
+  return cookies.length > 0 ? cookies.join('; ') : null;
 }
 
 // Called by list/search handlers: checks credentials, logs in, caches
@@ -367,14 +375,14 @@ async function performAuth(params) {
     try {
       var obj = typeof cached === 'string' ? JSON.parse(cached) : cached;
       var age = Date.now() - (obj.time || 0);
-      if (age < 3600000 && obj.cookie) return; // 1h cache
+      if (age < 21600000 && obj.cookie && obj.siteUrl === getSiteUrl(params) && obj.username === params.username) return; // 6h cache
     } catch (e) { /* ignore bad cache */ }
   }
 
   var siteUrl = getSiteUrl(params);
   var cookie = await loginToWP(siteUrl, params.username, params.password);
   if (cookie) {
-    Widget.storage.set(LOGIN_CACHE_KEY, JSON.stringify({ cookie: cookie, time: Date.now() }));
+    Widget.storage.set(LOGIN_CACHE_KEY, JSON.stringify({ cookie: cookie, siteUrl: siteUrl, username: params.username, time: Date.now() }));
   }
 }
 
@@ -390,7 +398,7 @@ function buildHeaders() {
   if (cached) {
     try {
       var obj = typeof cached === 'string' ? JSON.parse(cached) : cached;
-      if (obj.cookie) {
+      if (obj.cookie && Date.now() - (obj.time || 0) < 21600000) {
         headers['Cookie'] = obj.cookie;
       }
     } catch (e) { /* ignore */ }
@@ -515,39 +523,38 @@ function extractDetailTitle($, html) {
 
 async function loadEpisodeQualities(ep) {
   try {
-    if (!ep || !ep.videoUrl) return [];
-    var res = await Widget.http.get(ep.videoUrl, { headers: buildHeaders() });
-    var info = extractVideoInfo(res.data);
-    if (info && info.urls.length > 0) {
+    if (!ep) return [];
+    var sourceKey = ep.sourceId || ep.link || ep.videoUrl;
+    if (!sourceKey) return [];
+    var source = await loadSource(sourceKey);
+    if (source && source.sourceUrls && source.sourceUrls.length > 0) {
       var list = [];
-      for (var i = 0; i < info.urls.length; i++) {
-        list.push({ url: info.urls[i], name: info.names[i] || ('画质' + (i + 1)) });
+      for (var i = 0; i < source.sourceUrls.length; i++) {
+        list.push({ url: source.sourceUrls[i], name: (source.sourceNames && source.sourceNames[i]) || ('画质' + (i + 1)) });
       }
-      list.defaultIdx = info.defaultIdx || 0;
+      var defaultIdx = 0;
+      if (source.defaultSourceUrl) {
+        for (var di = 0; di < source.sourceUrls.length; di++) {
+          if (source.sourceUrls[di] === source.defaultSourceUrl) {
+            defaultIdx = di;
+            break;
+          }
+        }
+      }
+      list.defaultIdx = defaultIdx;
       return list;
+    }
+    if (source && source.sourceUrl) {
+      var single = [{ url: source.sourceUrl, name: '播放源' }];
+      single.defaultIdx = 0;
+      return single;
     }
   } catch (e) {
     console.log('[nfyingshi:qualities] 解析失败:', e.message || e);
   }
-  var fallback = ep && ep.videoUrl ? [{ url: ep.videoUrl, name: '播放源' }] : [];
+  var fallback = ep && /^https?:\/\//i.test(String(ep.videoUrl || '')) ? [{ url: ep.videoUrl, name: '播放源' }] : [];
   fallback.defaultIdx = 0;
   return fallback;
-}
-
-async function mapWithConcurrency(items, limit, mapper) {
-  var results = new Array(items.length);
-  var cursor = 0;
-  async function worker() {
-    while (cursor < items.length) {
-      var index = cursor++;
-      results[index] = await mapper(items[index], index);
-    }
-  }
-  var workers = [];
-  var count = Math.min(limit || 4, items.length);
-  for (var i = 0; i < count; i++) workers.push(worker());
-  await Promise.all(workers);
-  return results;
 }
 
 function extractSeasonInfo(seriesName) {
@@ -620,17 +627,12 @@ async function loadResource(params) {
       var epNum = ep.episode || extractEpisodeNumber(ep.title, i + 1);
       if (!isMovie && targetEpisode !== null && epNum !== targetEpisode) continue;
 
-      var qualities = [];
-      if (ep.qualityName && /^https?:\/\/.+\.(m3u8|mp4)(?:\?|#|$)/i.test(String(ep.videoUrl || ''))) {
-        qualities = [{ url: ep.videoUrl, name: ep.qualityName }];
-      } else {
-        qualities = await loadEpisodeQualities(ep);
-      }
+      var qualities = await loadEpisodeQualities(ep);
       for (var q = 0; q < qualities.length; q++) {
         if (!qualities[q].url) continue;
         var item = {
           name: '奈菲影视 ' + qualities[q].name,
-          description: detail.title + ' - ' + (ep.baseEpisodeTitle || ep.title) + ' - ' + qualities[q].name,
+          description: detail.title + ' - ' + ep.title + ' - ' + qualities[q].name,
           url: qualities[q].url,
         };
         if (epNum !== null) item._ep = epNum;
@@ -867,8 +869,9 @@ async function loadDetail(link) {
         description: title ? title + ' - ' + epTitle : epTitle,
         season: si.seasonNumber,
         episode: epNum,
+        sourceId: epId,
         link: epId,
-        videoUrl: siteUrl + '/v_play/' + epVid + '.html',
+        videoUrl: epId,
       });
       if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
     }
@@ -890,45 +893,6 @@ async function loadDetail(link) {
         pushEpisode(re.vid, re.title);
       }
     }
-
-    var resolvedGroups = await mapWithConcurrency(episodeItems, 6, async function(ep) {
-      var qualities = await loadEpisodeQualities(ep);
-      if (!qualities.length) {
-        return [ep];
-      }
-      var defaultIdx = qualities.defaultIdx || 0;
-      if (defaultIdx < 0 || defaultIdx >= qualities.length) defaultIdx = 0;
-      var ordered = [];
-      if (qualities[defaultIdx]) ordered.push({ quality: qualities[defaultIdx], index: defaultIdx });
-      for (var oq = 0; oq < qualities.length; oq++) {
-        if (oq !== defaultIdx) ordered.push({ quality: qualities[oq], index: oq });
-      }
-      var resolved = [];
-      for (var qq = 0; qq < ordered.length; qq++) {
-        var quality = ordered[qq].quality;
-        var qIndex = ordered[qq].index;
-        resolved.push({
-          id: ep.id + ':q' + qIndex,
-          type: 'url',
-          title: ep.title + (qualities.length > 1 ? ' · ' + quality.name : ''),
-          baseEpisodeTitle: ep.title,
-          qualityName: quality.name,
-          description: title + ' - ' + ep.title + ' - ' + quality.name,
-          season: ep.season,
-          episode: ep.episode,
-          link: ep.id + ':q' + qIndex,
-          videoUrl: quality.url,
-          playerType: 'system',
-        });
-      }
-      return resolved;
-    });
-    var resolvedEpisodeItems = [];
-    for (var gi = 0; gi < resolvedGroups.length; gi++) {
-      var group = resolvedGroups[gi] || [];
-      for (var gj = 0; gj < group.length; gj++) resolvedEpisodeItems.push(group[gj]);
-    }
-    if (resolvedEpisodeItems.length) episodeItems = resolvedEpisodeItems;
 
     // Genres
     var genreItems = [];
