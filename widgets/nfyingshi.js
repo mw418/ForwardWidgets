@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.4.0",
+  version: "1.4.1",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -200,15 +200,27 @@ function aesDecryptB64(base64str) {
   return aesDecrypt(bytes);
 }
 
-// ── Extract video URLs// ── Extract video URLs from play page ────────────────────────────────────
+// ── Extract video URLs
+function utf8Decode(bytes) {
+  var str = '', i = 0;
+  while (i < bytes.length) {
+    var c = bytes[i];
+    if (c < 0x80) { str += String.fromCharCode(c); i++; }
+    else if (c < 0xE0) { str += String.fromCharCode(((c & 0x1F) << 6) | (bytes[i+1] & 0x3F)); i += 2; }
+    else if (c < 0xF0) { str += String.fromCharCode(((c & 0x0F) << 12) | ((bytes[i+1] & 0x3F) << 6) | (bytes[i+2] & 0x3F)); i += 3; }
+    else { str += String.fromCharCode(((c & 0x07) << 18) | ((bytes[i+1] & 0x3F) << 12) | ((bytes[i+2] & 0x3F) << 6) | (bytes[i+3] & 0x3F)); i += 4; }
+  }
+  return str;
+}
+
+// ── Extract video URLs from play page ────────────────────────────────────
 
 function extractVideoInfo(html) {
   var m = html.match(/var\s+([\w$]+)\s*=\s*"([A-Za-z0-9+\/=]{500,})"/);
   if (!m) return null;
   var encrypted = m[2];
   var decrypted = aesDecryptB64(encrypted);
-  var decStr = '';
-  for (var i = 0; i < decrypted.length; i++) decStr += String.fromCharCode(decrypted[i]);
+  var decStr = utf8Decode(decrypted);
 
   var qualityMatch = decStr.match(/quality:\s*\[([^\]]+)\]/);
   if (!qualityMatch) return null;
