@@ -384,6 +384,17 @@ function parseMovieCards($, siteUrl) {
 
 // Chinese number to digit for season matching
 var CN_NUM = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
+var NUM_CN = { 1:'一',2:'二',3:'三',4:'四',5:'五',6:'六',7:'七',8:'八',9:'九',10:'十' };
+
+function toCNSeason(n) {
+  if (n <= 10) return NUM_CN[n] || String(n);
+  var s = '';
+  if (n >= 20) s += NUM_CN[Math.floor(n/10)] + '十';
+  else if (n >= 10) s += '十';
+  var r = n % 10;
+  if (r > 0) s += NUM_CN[r];
+  return s;
+}
 
 function extractBaseName(name) {
   var m = name.match(/第([一二三四五六七八九十\d]+)[季部]/);
@@ -408,7 +419,7 @@ async function loadResource(params) {
 
     // Build search query: if season known, add it
     var searchQuery = baseName;
-    if (targetSeason) searchQuery += ' 第' + targetSeason + '季';
+    if (targetSeason) searchQuery += ' 第' + toCNSeason(targetSeason) + '季';
 
     var url = siteUrl + '/?s=' + encodeURIComponent(searchQuery);
     var res = await Widget.http.get(url, { headers: buildHeaders() });
