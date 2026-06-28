@@ -111,12 +111,13 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
 
   _LOG("\n=== WidgetMetadata Tests ===");
   check("globalParams有server", () => assert.ok(WidgetMetadata.globalParams.find(p => p.name === "server")));
-  check("globalParams只有server", () => assert.equal(WidgetMetadata.globalParams.length, 1));
+  check("globalParams有登录参数", () => assert.deepEqual(WidgetMetadata.globalParams.map(p => p.name), ["server", "username", "password"]));
   check("modules有loadHot", () => assert.ok(WidgetMetadata.modules.find(m => m.id === "loadHot")));
   check("modules有loadRecent", () => assert.ok(WidgetMetadata.modules.find(m => m.id === "loadRecent")));
   check("modules有loadCategory", () => assert.ok(WidgetMetadata.modules.find(m => m.id === "loadCategory")));
   check("search配置存在", () => assert.ok(WidgetMetadata.search));
   check("search有keyword", () => assert.ok(WidgetMetadata.search.params.find(p => p.name === "keyword")));
+  check("sourceLoader配置存在", () => assert.equal(WidgetMetadata.sourceLoader.functionName, "loadSource"));
 
   _LOG("\n=== Handler Integration Tests ===");
   // These test that handlers call Widget.http correctly (auth headers, etc.)
@@ -141,6 +142,44 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
   calls.length = 0;
   var sItems = await search({ keyword: "test", server: "https://www.nfyingshi.com" });
   check("搜索返回数组", () => assert.ok(Array.isArray(sItems)));
+
+  _LOG("\n=== Quality Selection Tests ===");
+  var decryptedPlayer = "quality: [{url:'https://cdn.example.com/1080.m3u8', name:'1080P'},{url:\"https://cdn.example.com/720.m3u8\", name:\"720P\"}], defaultQuality: 1";
+  aesDecryptB64 = function () {
+    var bytes = [];
+    for (var i = 0; i < decryptedPlayer.length; i++) bytes.push(decryptedPlayer.charCodeAt(i) & 0xff);
+    return bytes;
+  };
+  var fakeEncryptedHtml = '<script>var player="' + new Array(520).join("A") + '";</script>';
+
+  var info = extractVideoInfo(fakeEncryptedHtml);
+  check("解析全部画质URL", () => assert.deepEqual(info.urls, ["https://cdn.example.com/1080.m3u8", "https://cdn.example.com/720.m3u8"]));
+  check("解析全部画质名称", () => assert.deepEqual(info.names, ["1080P", "720P"]));
+  check("解析默认画质", () => assert.equal(info.defaultIdx, 1));
+
+  var oldGet = Widget.http.get;
+  Widget.http.get = async (url, opts) => {
+    calls.push("GET:" + url);
+    if (url.indexOf("/movie/9000.html") !== -1) {
+      return { data: '<a href="https://www.nfyingshi.com/v_play/testvid.html">第1集</a>', status: 200 };
+    }
+    if (url.indexOf("/v_play/testvid.html") !== -1) {
+      return { data: fakeEncryptedHtml, status: 200 };
+    }
+    return oldGet(url, opts);
+  };
+
+  var source = await loadSource("nfep:9000:testvid:q1");
+  check("指定画质link返回对应sourceUrl", () => assert.equal(source.sourceUrl, "https://cdn.example.com/720.m3u8"));
+
+  var multiSource = await loadSource("nfep:9000:testvid");
+  check("未指定画质时返回多画质列表", () => assert.deepEqual(multiSource.sourceNames, ["1080P", "720P"]));
+
+  var qDetail = await loadDetail("nf:9000");
+  check("详情每集保留父级集数", () => assert.equal(qDetail.episodeItems.length, 1));
+  check("详情每集展示全部画质子项", () => assert.deepEqual(qDetail.episodeItems[0].childItems.map(x => x.title), ["1080P", "720P"]));
+  check("父级默认播放使用defaultQuality", () => assert.equal(qDetail.episodeItems[0].videoUrl, "https://cdn.example.com/720.m3u8"));
+  Widget.http.get = oldGet;
 
   _LOG("\n" + "=".repeat(40));
   _LOG("  通过: " + pass + " / " + (pass + fail));

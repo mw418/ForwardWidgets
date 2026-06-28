@@ -222,12 +222,21 @@ async function loadSource(link) {
     if (parts.length < 3 || parts[0] !== 'nfep') return null;
     var postId = parts[1];
     var epVid = parts[2];
+    var qualityIndex = -1;
+    if (parts.length >= 4) {
+      var qualityMatch = String(parts[3]).match(/^q(\d+)$/);
+      if (qualityMatch) qualityIndex = parseInt(qualityMatch[1], 10);
+    }
 
     var siteUrl = 'https://www.nfyingshi.com';
     var playUrl = siteUrl + '/v_play/' + epVid + '.html';
     var res = await Widget.http.get(playUrl, { headers: buildHeaders() });
     var info = extractVideoInfo(res.data);
     if (!info || !info.urls.length) return null;
+
+    if (qualityIndex >= 0) {
+      return { sourceUrl: info.urls[qualityIndex] || info.urls[info.defaultIdx] || info.urls[0] };
+    }
 
     if (info.urls.length === 1) {
       return { sourceUrl: info.urls[0] };
@@ -257,18 +266,22 @@ function extractVideoInfo(html) {
   if (!qualityMatch) return null;
 
   var urls = [];
-  var urlRe = /url:\s*'([^']+)'/g;
+  var urlRe = /url:\s*['"]([^'"]+)['"]/g;
   var um;
   while ((um = urlRe.exec(qualityMatch[1])) !== null) urls.push(um[1]);
 
   var names = [];
-  var nameRe = /name:\s*'([^']+)'/g;
+  var nameRe = /name:\s*['"]([^'"]+)['"]/g;
   var nm;
   while ((nm = nameRe.exec(qualityMatch[1])) !== null) names.push(nm[1]);
 
   var defaultIdx = 0;
   var defaultMatch = decStr.match(/defaultQuality:\s*(\d+)/);
   if (defaultMatch) defaultIdx = parseInt(defaultMatch[1]) || 0;
+  if (defaultIdx < 0 || defaultIdx >= urls.length) defaultIdx = 0;
+  for (var i = 0; i < urls.length; i++) {
+    if (!names[i]) names[i] = '画质' + (i + 1);
+  }
 
   return { urls: urls, names: names, defaultIdx: defaultIdx };
 }
@@ -407,7 +420,7 @@ function parseMovieCards($, siteUrl) {
       items.push({
         id: 'nf:' + postId,
         type: 'url',
-        title: epTitle,
+        title: title,
         posterPath: poster,
         link: 'nf:' + postId,
         rating: rating,
@@ -480,7 +493,7 @@ async function loadResource(params) {
       // Prefer exact season match
       for (var ci = 0; ci < cards.length; ci++) {
         var si = extractSeasonInfo(cards[ci].title);
-        if (si.season === targetSeason) { best = cards[ci]; break; }
+        if (si.seasonNumber === targetSeason) { best = cards[ci]; break; }
       }
     }
     var detail = await loadDetail(best.link);
@@ -568,7 +581,7 @@ async function loadRecent(params) {
         items.push({
           id: 'nf:' + postId,
           type: 'url',
-          title: epTitle,
+          title: title,
           posterPath: poster,
           link: 'nf:' + postId,
           rating: rating,
@@ -742,8 +755,6 @@ async function loadDetail(link) {
       if (epMatch) {
         var epVid = epMatch[1];
         var epId = 'nfep:' + postId + ':' + epVid;
-        var epNum = parseInt((epTitle.match(/\d+/) || [])[0]) || 0;
-        var si = extractSeasonInfo(title);
         var si = extractSeasonInfo(title);
         var epNum = parseInt((epTitle.match(/\d+/) || [])[0]) || 0;
         episodeItems.push({
@@ -766,8 +777,6 @@ async function loadDetail(link) {
       for (var ri = 0; ri < rawEps.length; ri++) {
         var re = rawEps[ri];
         var rId = 'nfep:' + postId + ':' + re.vid;
-        var reNum = parseInt((re.title.match(/\d+/) || [])[0]) || 0;
-        var rsi = extractSeasonInfo(title);
         var rsi = extractSeasonInfo(title);
         var reNum = parseInt((re.title.match(/\d+/) || [])[0]) || 0;
         episodeItems.push({
@@ -823,6 +832,7 @@ async function loadDetail(link) {
           var info = extractVideoInfo(playRes.data);
           if (info && info.urls.length > 0) {
             ep._q = [];
+            ep._defaultIdx = info.defaultIdx || 0;
             for (var q = 0; q < info.urls.length; q++) {
               ep._q.push({ u: info.urls[q], n: info.names[q] || '画质' + (q + 1) });
             }
@@ -833,26 +843,29 @@ async function loadDetail(link) {
     await Promise.all(epTasks);
 
     var si = extractSeasonInfo(title);
-    var flat = [];
     for (var ei = 0; ei < episodeItems.length; ei++) {
       var ep = episodeItems[ei];
-      var epNum = parseInt((ep.title.match(/\d+/) || [])[0]) || 0;
+      var epNum = ep.episode || parseInt((ep.title.match(/\d+/) || [])[0]) || 0;
       if (ep._q && ep._q.length > 0) {
+        var defaultQ = ep._q[ep._defaultIdx] || ep._q[0];
+        ep.videoUrl = defaultQ.u;
+        ep.description = title + ' - ' + ep.title + ' - 默认' + defaultQ.n;
+        ep.childItems = [];
         for (var q = 0; q < ep._q.length; q++) {
-          flat.push({
+          ep.childItems.push({
             id: ep.id + ':q' + q, type: 'url',
-            title: ep.title,
+            title: ep._q[q].n,
             videoUrl: ep._q[q].u,
             description: title + ' - ' + ep.title + ' - ' + ep._q[q].n,
             season: si.seasonNumber, episode: epNum,
             link: ep.id + ':q' + q,
+            playerType: 'system',
           });
         }
-      } else {
-        flat.push(ep);
+        delete ep._q;
+        delete ep._defaultIdx;
       }
     }
-    episodeItems = flat;
 
 
 
