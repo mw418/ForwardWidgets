@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.3.4",
+  version: "1.3.5",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -768,29 +768,48 @@ async function loadDetail(link) {
       if (yearMatch) releaseDate = yearMatch[1] + '-01-01';
     }
 
-    // Pre-resolve video URLs in parallel (like VodStream Promise.all)
+    // Pre-resolve video URLs in parallel, then expand to per-quality flat items (like VodStream)
     var epTasks = [];
     for (var ei = 0; ei < episodeItems.length; ei++) {
       epTasks.push((function(ep) {
         return Widget.http.get(ep.videoUrl, { headers: buildHeaders() }).then(function(playRes) {
           var info = extractVideoInfo(playRes.data);
           if (info && info.urls.length > 0) {
-            ep.videoUrl = info.urls[info.defaultIdx] || info.urls[0];
-            ep.childItems = [];
+            ep._qualities = [];
             for (var q = 0; q < info.urls.length; q++) {
-              ep.childItems.push({
-                id: ep.id + ':q' + q,
-                type: 'url',
-                title: info.names[q] || ('画质' + (q + 1)),
-                videoUrl: info.urls[q],
-                link: ep.id + ':q' + q,
+              ep._qualities.push({
+                url: info.urls[q],
+                name: info.names[q] || ('画质' + (q + 1)),
               });
             }
+            ep.videoUrl = info.urls[info.defaultIdx] || info.urls[0];
           }
         }).catch(function() { /* keep play-page URL */ });
       })(episodeItems[ei]));
     }
     await Promise.all(epTasks);
+
+    // Expand episodes into flat per-quality items
+    var flatEps = [];
+    for (var ei = 0; ei < episodeItems.length; ei++) {
+      var ep = episodeItems[ei];
+      if (ep._qualities && ep._qualities.length > 0) {
+        for (var q = 0; q < ep._qualities.length; q++) {
+          var qInfo = ep._qualities[q];
+          flatEps.push({
+            id: ep.id + ':q' + q,
+            type: 'url',
+            title: ep.title + ' - ' + qInfo.name,
+            posterPath: poster,
+            videoUrl: qInfo.url,
+            link: ep.id + ':q' + q,
+          });
+        }
+      } else {
+        flatEps.push(ep);
+      }
+    }
+    episodeItems = flatEps;
 
     return {
       id: 'nf:' + postId,
