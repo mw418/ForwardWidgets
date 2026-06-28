@@ -413,7 +413,7 @@ async function loadResource(params) {
     var url = siteUrl + '/?s=' + encodeURIComponent(searchQuery);
     var res = await Widget.http.get(url, { headers: buildHeaders() });
     var $ = Widget.html.load(res.data);
-    var cards = parseMovieCards($, siteUrl);
+    var cards = parseSearchCards($, siteUrl);
     if (!cards.length) return [];
 
     // Filter by season if needed
