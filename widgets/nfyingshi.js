@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.9.2",
+  version: "1.9.3",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -534,6 +534,22 @@ async function loadEpisodeQualities(ep) {
   return fallback;
 }
 
+async function mapWithConcurrency(items, limit, mapper) {
+  var results = new Array(items.length);
+  var cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      var index = cursor++;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+  var workers = [];
+  var count = Math.min(limit || 4, items.length);
+  for (var i = 0; i < count; i++) workers.push(worker());
+  await Promise.all(workers);
+  return results;
+}
+
 function extractSeasonInfo(seriesName) {
   if (!seriesName) return { baseName: seriesName, seasonNumber: 1 };
   // "第X季"/"第X部"
@@ -605,13 +621,8 @@ async function loadResource(params) {
       if (!isMovie && targetEpisode !== null && epNum !== targetEpisode) continue;
 
       var qualities = [];
-      if (ep.childItems && ep.childItems.length > 0) {
-        for (var cq = 0; cq < ep.childItems.length; cq++) {
-          qualities.push({
-            url: ep.childItems[cq].videoUrl,
-            name: ep.childItems[cq].qualityName || ep.childItems[cq].title,
-          });
-        }
+      if (ep.qualityName && /^https?:\/\/.+\.(m3u8|mp4)(?:\?|#|$)/i.test(String(ep.videoUrl || ''))) {
+        qualities = [{ url: ep.videoUrl, name: ep.qualityName }];
       } else {
         qualities = await loadEpisodeQualities(ep);
       }
@@ -619,7 +630,7 @@ async function loadResource(params) {
         if (!qualities[q].url) continue;
         var item = {
           name: '奈菲影视 ' + qualities[q].name,
-          description: detail.title + ' - ' + ep.title + ' - ' + qualities[q].name,
+          description: detail.title + ' - ' + (ep.baseEpisodeTitle || ep.title) + ' - ' + qualities[q].name,
           url: qualities[q].url,
         };
         if (epNum !== null) item._ep = epNum;
@@ -880,34 +891,44 @@ async function loadDetail(link) {
       }
     }
 
-    for (var qi = 0; qi < episodeItems.length; qi++) {
-      var ep = episodeItems[qi];
+    var resolvedGroups = await mapWithConcurrency(episodeItems, 6, async function(ep) {
       var qualities = await loadEpisodeQualities(ep);
-      if (!qualities.length) continue;
+      if (!qualities.length) {
+        return [ep];
+      }
       var defaultIdx = qualities.defaultIdx || 0;
       if (defaultIdx < 0 || defaultIdx >= qualities.length) defaultIdx = 0;
-      var defaultQuality = qualities[defaultIdx] || qualities[0];
-      ep.videoUrl = defaultQuality.url;
-      ep.link = ep.id + ':q' + defaultIdx;
-      ep.playerType = 'system';
-      if (qualities.length > 1) {
-        ep.childItems = [];
-        for (var qq = 0; qq < qualities.length; qq++) {
-          ep.childItems.push({
-            id: ep.id + ':q' + qq,
-            type: 'url',
-            title: ep.title + ' · ' + qualities[qq].name,
-            qualityName: qualities[qq].name,
-            description: title + ' - ' + ep.title + ' - ' + qualities[qq].name,
-            season: ep.season,
-            episode: ep.episode,
-            link: ep.id + ':q' + qq,
-            videoUrl: qualities[qq].url,
-            playerType: 'system',
-          });
-        }
+      var ordered = [];
+      if (qualities[defaultIdx]) ordered.push({ quality: qualities[defaultIdx], index: defaultIdx });
+      for (var oq = 0; oq < qualities.length; oq++) {
+        if (oq !== defaultIdx) ordered.push({ quality: qualities[oq], index: oq });
       }
+      var resolved = [];
+      for (var qq = 0; qq < ordered.length; qq++) {
+        var quality = ordered[qq].quality;
+        var qIndex = ordered[qq].index;
+        resolved.push({
+          id: ep.id + ':q' + qIndex,
+          type: 'url',
+          title: ep.title + (qualities.length > 1 ? ' · ' + quality.name : ''),
+          baseEpisodeTitle: ep.title,
+          qualityName: quality.name,
+          description: title + ' - ' + ep.title + ' - ' + quality.name,
+          season: ep.season,
+          episode: ep.episode,
+          link: ep.id + ':q' + qIndex,
+          videoUrl: quality.url,
+          playerType: 'system',
+        });
+      }
+      return resolved;
+    });
+    var resolvedEpisodeItems = [];
+    for (var gi = 0; gi < resolvedGroups.length; gi++) {
+      var group = resolvedGroups[gi] || [];
+      for (var gj = 0; gj < group.length; gj++) resolvedEpisodeItems.push(group[gj]);
     }
+    if (resolvedEpisodeItems.length) episodeItems = resolvedEpisodeItems;
 
     // Genres
     var genreItems = [];
