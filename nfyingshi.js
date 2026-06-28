@@ -63,11 +63,6 @@ WidgetMetadata = {
     ],
   },
   },
-  sourceLoader: {
-    title: "解析播放源",
-    functionName: "loadSource",
-    params: [],
-  },
 };
 
 // ── Pure JS AES-128-CBC Decrypt ────────────────────────────────────
@@ -260,11 +255,6 @@ async function loadSource(link) {
 
     if (info.urls.length === 1) {
       return { sourceUrl: info.urls[0]   },
-  sourceLoader: {
-    title: "解析播放源",
-    functionName: "loadSource",
-    params: [],
-  },
 };
     }
 
@@ -274,11 +264,6 @@ async function loadSource(link) {
       sourceNames: info.names,
       defaultSourceUrl: info.urls[info.defaultIdx] || info.urls[0],
       },
-  sourceLoader: {
-    title: "解析播放源",
-    functionName: "loadSource",
-    params: [],
-  },
 };
   } catch (e) {
     console.error('[nfyingshi:loadSource]', e.message || e);
@@ -314,11 +299,6 @@ function extractVideoInfo(html) {
   if (defaultMatch) defaultIdx = parseInt(defaultMatch[1]) || 0;
 
   return { urls: urls, names: names, defaultIdx: defaultIdx   },
-  sourceLoader: {
-    title: "解析播放源",
-    functionName: "loadSource",
-    params: [],
-  },
 };
 }
 
@@ -421,11 +401,6 @@ function buildHeaders() {
   var headers = {
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
     },
-  sourceLoader: {
-    title: "解析播放源",
-    functionName: "loadSource",
-    params: [],
-  },
 };
 
   // Check cached login cookie
@@ -560,11 +535,6 @@ var CATEGORY_URLS = {
   'fanzui': '/movie_bt_tags/fanzui',
   'donghua': '/movie_bt_tags/donghua',
   },
-  sourceLoader: {
-    title: "解析播放源",
-    functionName: "loadSource",
-    params: [],
-  },
 };
 
 async function loadCategory(params) {
@@ -672,6 +642,7 @@ async function loadDetail(link) {
           type: 'url',
           title: epTitle,
           link: epId,
+          videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
         if (!trailerUrl) {
           trailerUrl = siteUrl + '/v_play/' + epVid + '.html';
@@ -711,6 +682,25 @@ async function loadDetail(link) {
       if (yearMatch) releaseDate = yearMatch[1] + '-01-01';
     }
 
+    // Pre-resolve video URLs from play pages
+    for (var ei = 0; ei < episodeItems.length; ei++) {
+      var ep = episodeItems[ei];
+      try {
+        var playRes = await Widget.http.get(ep.videoUrl, { headers: buildHeaders() });
+        var info = extractVideoInfo(playRes.data);
+        if (info && info.urls.length > 0) {
+          ep.videoUrl = info.urls[info.defaultIdx] || info.urls[0];
+          // Expose all quality options for Forward player
+          if (info.urls.length > 1) {
+            ep.qualityUrls = info.urls;
+            ep.qualityNames = info.names;
+          }
+        }
+      } catch (e) {
+        // Keep play-page URL as fallback
+      }
+    }
+
     return {
       id: 'nf:' + postId,
       type: 'url',
@@ -726,11 +716,6 @@ async function loadDetail(link) {
       link: 'nf:' + postId,
       trailers: trailerUrl ? [{ coverUrl: trailerCover, url: trailerUrl }] : [],
       },
-  sourceLoader: {
-    title: "解析播放源",
-    functionName: "loadSource",
-    params: [],
-  },
 };
   } catch (e) {
     console.error('[nfyingshi:loadDetail]', e.message || e);
