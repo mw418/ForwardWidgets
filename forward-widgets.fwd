@@ -56,6 +56,15 @@
       "version": "1.0.0",
       "author": "Forward",
       "url": "https://assets.vvebo.vip/scripts/trendingmedia.js"
+    },
+    {
+      "id": "forward.nfyingshi",
+      "title": "奈菲影视",
+      "description": "获取奈菲影视的美剧、英剧、韩剧、纪录片等影视内容，支持账号登录",
+      "requiredVersion": "0.0.1",
+      "version": "1.1.0",
+      "author": "mw99",
+      "url": "https://raw.githubusercontent.com/mw418/ForwardWidgets/refs/heads/master/nfyingshi.js"
     }
   ]
 }
