@@ -417,27 +417,23 @@ async function loadResource(params) {
     var baseName = _b.baseName;
     var targetSeason = season ? parseInt(season) : (_b.season || null);
 
-    // Build search query: if season known, add it
+    // Search with base name only (don't confuse search engine with season suffix)
     var searchQuery = baseName;
-    if (targetSeason) searchQuery += ' 第' + toCNSeason(targetSeason) + '季';
-
     var url = siteUrl + '/?s=' + encodeURIComponent(searchQuery);
     var res = await Widget.http.get(url, { headers: buildHeaders() });
     var $ = Widget.html.load(res.data);
     var cards = parseSearchCards($, siteUrl);
     if (!cards.length) return [];
 
-    // Filter by season if needed
-    if (targetSeason) {
-      cards = cards.filter(function(card) {
-        var si = extractBaseName(card.title);
-        return si.season === targetSeason;
-      });
-    }
-    if (!cards.length) return [];
-
-    // Take the best match and resolve episode video URLs
+    // Match best card by season
     var best = cards[0];
+    if (targetSeason && cards.length > 1) {
+      // Prefer exact season match
+      for (var ci = 0; ci < cards.length; ci++) {
+        var si = extractBaseName(cards[ci].title);
+        if (si.season === targetSeason) { best = cards[ci]; break; }
+      }
+    }
     var detail = await loadDetail(best.link);
     if (!detail || !detail.episodeItems || !detail.episodeItems.length) return [];
 
