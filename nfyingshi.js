@@ -70,7 +70,6 @@ WidgetMetadata = {
       { name: "page", title: "页码", type: "page" },
     ],
   },
-  },
 };
 
 // ── Pure JS AES-128-CBC Decrypt ────────────────────────────────────
@@ -262,8 +261,7 @@ async function loadSource(link) {
     if (!info || !info.urls.length) return null;
 
     if (info.urls.length === 1) {
-      return { sourceUrl: info.urls[0]   },
-};
+      return { sourceUrl: info.urls[0] };
     }
 
     // Multiple qualities: return all so player shows quality selector
@@ -271,8 +269,7 @@ async function loadSource(link) {
       sourceUrls: info.urls,
       sourceNames: info.names,
       defaultSourceUrl: info.urls[info.defaultIdx] || info.urls[0],
-      },
-};
+    };
   } catch (e) {
     console.error('[nfyingshi:loadSource]', e.message || e);
     return null;
