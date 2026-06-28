@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.6.11",
+  version: "1.7.0",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -737,7 +737,7 @@ async function loadDetail(link) {
 
     $('a[href*="v_play"]').each(function () {
       var epHref = $(this).attr('href') || '';
-      var epTitle = $(this).text().trim();
+      var epTitle = $(this).text().trim().replace(/vip/gi, '').trim();
       var epMatch = epHref.match(/v_play\/([^.]+)\.html/);
       if (epMatch) {
         var epVid = epMatch[1];
@@ -823,12 +823,7 @@ async function loadDetail(link) {
     }
     await Promise.all(epTasks);
 
-    // Delete parent videoUrl for episodes with childItems (Forward picks from childItems)
-    for (var ei = 0; ei < episodeItems.length; ei++) {
-      if (episodeItems[ei].childItems && episodeItems[ei].childItems.length > 0) {
-        delete episodeItems[ei].videoUrl;
-      }
-    }
+
 
     return {
       id: 'nf:' + postId,
