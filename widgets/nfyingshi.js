@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.6.7",
+  version: "1.6.8",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -407,7 +407,7 @@ function parseMovieCards($, siteUrl) {
       items.push({
         id: 'nf:' + postId,
         type: 'url',
-        title: title.indexOf('季') !== -1 ? title : title + ' 第' + extractSeasonInfo(title).seasonNumber + '季',
+        title: epTitle,
         posterPath: poster,
         link: 'nf:' + postId,
         rating: rating,
@@ -568,7 +568,7 @@ async function loadRecent(params) {
         items.push({
           id: 'nf:' + postId,
           type: 'url',
-          title: title.indexOf('季') !== -1 ? title : title + ' 第' + extractSeasonInfo(title).seasonNumber + '季',
+          title: epTitle,
           posterPath: poster,
           link: 'nf:' + postId,
           rating: rating,
@@ -640,7 +640,7 @@ function parseSearchCards($, siteUrl) {
     var rating = $rating.length ? parseFloat($rating.first().text().trim()) || undefined : undefined;
     if (title && postId) {
       items.push({
-        id: "nf:" + postId, type: "url", title: title.indexOf('季') !== -1 ? title : title + ' 第' + extractSeasonInfo(title).seasonNumber + '季',
+        id: "nf:" + postId, type: "url", title: epTitle,
         posterPath: poster, link: "nf:" + postId,
         rating: rating, postId: postId,
       });
@@ -745,7 +745,7 @@ async function loadDetail(link) {
         var epNum = parseInt((epTitle.match(/\d+/) || [])[0]) || 0;
         var si = extractSeasonInfo(title);
         episodeItems.push({
-          id: epId, type: 'url', title: title.indexOf('季') !== -1 ? title : title + ' 第' + extractSeasonInfo(title).seasonNumber + '季', coverUrl: poster, posterPath: poster, description: title + ' - ' + epTitle, season: si.seasonNumber, episode: epNum, playerType: 'system', link: epId,
+          id: epId, type: 'url', title: epTitle, coverUrl: poster, posterPath: poster, description: title + ' - ' + epTitle, season: si.seasonNumber, episode: epNum, playerType: 'system', link: epId,
           videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
@@ -761,7 +761,7 @@ async function loadDetail(link) {
         var reNum = parseInt((re.title.match(/\d+/) || [])[0]) || 0;
         var rsi = extractSeasonInfo(title);
         episodeItems.push({
-          id: rId, type: 'url', title: title.indexOf('季') !== -1 ? title : title + ' 第' + extractSeasonInfo(title).seasonNumber + '季', coverUrl: poster, posterPath: poster, description: title + ' - ' + re.title, season: rsi.seasonNumber, episode: reNum, playerType: 'system', link: rId,
+          id: rId, type: 'url', title: epTitle, coverUrl: poster, posterPath: poster, description: title + ' - ' + re.title, season: rsi.seasonNumber, episode: reNum, playerType: 'system', link: rId,
           videoUrl: siteUrl + '/v_play/' + re.vid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + re.vid + '.html'; trailerCover = poster; }
@@ -833,7 +833,7 @@ async function loadDetail(link) {
     return {
       id: 'nf:' + postId,
       type: 'url',
-      title: title.indexOf('季') !== -1 ? title : title + ' 第' + extractSeasonInfo(title).seasonNumber + '季',
+      title: epTitle,
       coverUrl: poster,
       posterPath: poster,
       backdropPath: backdropPaths[0] || poster,
