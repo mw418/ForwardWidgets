@@ -15,6 +15,14 @@ WidgetMetadata = {
   ],
   modules: [
     {
+      id: "loadResource",
+      title: "资源",
+      functionName: "loadResource",
+      type: "stream",
+      cacheDuration: 3600,
+      params: [],
+    },
+    {
       id: "loadHot",
       title: "热映推荐",
       functionName: "loadHot",
@@ -451,6 +459,41 @@ function parseMovieCards($, siteUrl) {
     }
   });
   return items;
+}
+
+// ── Handler: Resource (stream type) ────────────────────────────────────
+
+async function loadResource(params) {
+  try {
+    var seriesName = params.seriesName;
+    if (!seriesName) return [];
+
+    var siteUrl = getSiteUrl(params);
+    var url = siteUrl + '/?s=' + encodeURIComponent(seriesName);
+    var res = await Widget.http.get(url, { headers: buildHeaders() });
+    var $ = Widget.html.load(res.data);
+    var cards = parseMovieCards($, siteUrl);
+    if (!cards.length) return [];
+
+    // Take the best match and resolve episode video URLs
+    var best = cards[0];
+    var detail = await loadDetail(best.link);
+    if (!detail || !detail.episodeItems || !detail.episodeItems.length) return [];
+
+    var resources = [];
+    for (var i = 0; i < detail.episodeItems.length; i++) {
+      var ep = detail.episodeItems[i];
+      resources.push({
+        name: 'nfyingshi',
+        description: detail.title + ' - ' + ep.title,
+        url: ep.videoUrl || '',
+      });
+    }
+    return resources;
+  } catch (e) {
+    console.error('[nfyingshi:loadResource]', e.message || e);
+    return [];
+  }
 }
 
 // ── Handler: Hot Movies ────────────────────────────────────
