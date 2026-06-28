@@ -19,6 +19,10 @@ ForwardWidget is a JS component for building modules that provides rich web-rela
 
 ForwardWidget supports extending functionality through JavaScript scripts. Each Widget is an independent JavaScript file that must follow specific structure and specifications.
 
+### Scaffold
+
+Running `node scaffold/create-widget.js` with no options instantly writes a default widget template (id `forward.meta.demo`, module `loadResource`) under `widgets/` and validates the resulting `WidgetMetadata`—no prompts required. Use `--interactive` or pass options such as `--id`, `--title`, `--modules '[...]'`, and `--output widgets` when you need custom values. See `scaffold/README.md` for the full option list.
+
 ### Widget Metadata Configuration
 
 Each Widget script must start with a `WidgetMetadata` object that defines the basic information and functional modules:
@@ -160,13 +164,44 @@ const response = await Widget.http.post(url, body, options);
 let data = response.data
 ```
 
+### List Module API
+
+A normal video list module should be declared in `WidgetMetadata.modules`, with `functionName` pointing to the handler. The handler returns `VideoItem[]`.
+
+```javascript
+async function loadList(params) {
+  return [
+    {
+      id: 550,
+      type: "tmdb",
+      title: "Fight Club",
+      mediaType: "movie",
+    },
+  ];
+}
+```
+
+When users open a list from a category or actor on the detail page, the client goes back to the list module that produced the current item and passes the selected id in `params`:
+
+```javascript
+// Genre id, matching genreItems[].id
+params.genreId
+
+// Actor / person id
+params.peopleId
+```
+
+Category and actor objects in list items must include `id`; otherwise the detail page cannot open the matching list.
+
 ### Loading Detail Data When Type is "link"
 
 ```javascript
 async function loadDetail(link) {
-    // Must return an object containing videoUrl
+    // Return VideoItem or VideoItem[], using the same model as loadList items
 }
 ```
+
+`loadDetail` is a top-level Widget function, not a module in `modules`. The detail page calls it with the list item's `link` to supplement detail data such as stills, trailers, categories, actors, related items, and playback URL.
 
 ### Return Data Format
 
@@ -178,23 +213,67 @@ Handler functions need to return an array of objects that conform to the Forward
     id: "unique_id",            // Based on the main value of different types. When type is url, it's the corresponding url. When type is douban, imdb, or tmdb, id is the corresponding id value. For tmdb id, it needs to be composed of type.id, e.g., tv.123 movie.234.
     type: "type",               // Type identifier url, douban, imdb, tmdb
     title: "title",             // Title
-    posterPath: "url",          // Vertical cover image URL
-    backdropPath: "url",        // Horizontal cover URL
+    coverUrl: "url",            // Generic fallback cover: used after backdropPath in landscape slots, last in portrait slots. Filling only this works everywhere
+    posterPath: "url",          // Vertical poster, preferred in portrait slots; also recognizes aliases posterUrl / poster_url
+    detailPoster: "url",        // Optional, dedicated poster for the detail page, overrides posterPath
+    backdropPath: "url",        // Horizontal cover, preferred in landscape slots (detail page top, horizontal lists)
     releaseDate: "date",        // Release date
     mediaType: "tv|movie",      // Media type
     rating: "5",                // Rating
     genreTitle: "genre",        // Genre
+    genreItems: [               // Clickable categories; detail page uses id to open a list
+      {
+        id: "action",
+        title: "Action"
+      }
+    ],
+    peoples: [                  // Actors / people; detail page uses id to open a list
+      {
+        id: "person_id",
+        title: "Actor Name",
+        avatar: "url",
+        role: "Role"
+      }
+    ],
     duration: 123,              // Duration number
     durationText: "00:00",      // Duration text
     previewUrl: "url",          // Preview video URL
+    trailers: [                 // Trailers; object format is recommended
+      {
+        coverUrl: "url",        // Trailer cover
+        url: "videoUrl"         // Trailer URL
+      }
+    ],
     videoUrl: "videoUrl",       // Video playback URL
     link: "link",               // Detail page URL
     episode: 1,                 // Episode number
     description: "description", // Description
     playerType: "system",       // player type system | app
-    childItems: [VideoItem]     // Nested items of current object, maximum one level
+    backdropPaths: ["url"],     // Stills / screenshots shown on detail page
+    childItems: [VideoItem],    // Nested items of current object, maximum one level
+    episodeItems: [VideoItem],  // Episode list
+    relatedItems: [VideoItem]   // Related recommendations
 }
 ```
+
+`loadList` and `loadDetail` should use the same `VideoItem` model. `loadDetail` may return only the fields needed by the detail page, but field names and structures should stay consistent.
+
+#### Image fields & display slots (important)
+
+The App picks the image field by **display slot**, with a **fallback chain**: an item only needs one or two of these fields, and missing slots fall back automatically (left to right, first non-empty value wins).
+
+| Display slot | Fallback chain |
+|---|---|
+| Detail page top image, horizontal list thumbnail (landscape slot) | `backdropPath` → `coverUrl` → `posterPath` |
+| Vertical poster wall (portrait slot, poster-style list) | `posterPath` → `backdropPath` → `coverUrl` |
+| Detail page poster slot | `detailPoster` (falls back to the portrait slot) |
+| Detail page stills carousel | `backdropPaths` (array, independent field, not part of the chains above) |
+| Trailer cover | `trailers[].coverUrl` → `coverUrl` → `backdropPath` → `posterPath` |
+
+- **`coverUrl` is the "generic fallback cover"**: filling only it shows an image in both landscape (second priority) and portrait (last priority) slots. "Detail page top has an image without `backdropPath` set" is exactly the fallback to `coverUrl`.
+- **Field aliases**: `posterPath` also recognizes `posterUrl` / `poster_url`; `backdropPaths` also recognizes `backdropImageUrls`.
+- **`tmdb` / `douban` / `imdb` types don't use these chains**: they use the built-in detail page, where images come from the corresponding platform's data; for `tmdb`, pass raw TMDB paths (e.g. `/abc.jpg`) to `posterPath`/`backdropPath`.
+- **Rule of thumb**: fill `backdropPath` for landscape slots (detail top, horizontal lists) and `posterPath` for portrait slots (posters); if you only have one image and don't want to distinguish orientation, fill `coverUrl` as the all-slot fallback.
 
 ### Best Practices
 
@@ -218,6 +297,111 @@ Handler functions need to return an array of objects that conform to the Forward
    - Add necessary comments
    - Modularize processing logic
 
+### Danmu Segment Loading Process
+
+ForwardWidget supports danmu segment loading functionality, suitable for long video (such as anime, TV series) danmu systems. Danmu are organized by time segments, supporting on-demand loading to improve performance and user experience.
+
+#### Danmu Module Configuration
+
+When configuring danmu modules in `WidgetMetadata`, you need to specify `type: "danmu"`:
+
+```javascript
+modules: [
+  {
+    id: "searchDanmu",           // Search danmu module, id must be fixed
+    title: "Search Danmu",
+    functionName: "searchDanmu",
+    type: "danmu",               // Specify as danmu type
+    params: []
+  },
+  {
+    id: "getComments",           // Get danmu module, id must be fixed
+    title: "Get Danmu",
+    functionName: "getCommentsById",
+    type: "danmu",
+    params: []
+  },
+  {
+    id: "getDanmuWithSegmentTime", // Get danmu for specified time module
+    title: "Get Danmu for Specified Time",
+    functionName: "getDanmuWithSegmentTime",
+    type: "danmu",
+    params: []
+  }
+]
+```
+
+#### Danmu Parameter Description
+
+Danmu modules automatically carry the following parameters:
+
+- **Basic Parameters**:
+  - `tmdbId`: TMDB ID, used for local storage identification
+  - `type`: Video type (tv | movie)
+  - `title`: Search keywords
+  - `commentId`: Danmu ID, carried when actually loading after searching danmu list
+  - `animeId`: Anime ID, carried when actually loading after searching anime list
+
+- **Video Information Parameters**:
+  - `seriesName`: Series name
+  - `episodeName`: Episode name
+  - `airDate`: Air date
+  - `runtime`: Duration
+  - `premiereDate`: Premiere date
+  - `season`: Season number (empty for movies)
+  - `episode`: Episode number (empty for movies)
+  - `link`: Link
+  - `videoUrl`: Video link
+
+- **Time Parameters**:
+  - `segmentTime`: Specified time, used to get danmu for corresponding time point
+
+#### Danmu Loading Process
+
+Danmu loading process:
+
+1. **Search Danmu** (`searchDanmu`) - Search danmu resources based on video title
+2. **Get Danmu Data** (`getCommentsById`) - Get danmu segment information from server or use local cache
+3. **Time Point Matching** (`getDanmuWithSegmentTime`) - Find corresponding danmu based on playback time. Optional.
+
+For specific implementation code, see the `widgets/segmentDanmuExample.js` file.
+
+#### Danmu Response Format
+
+Built-in support for mainstream danmu data formats including JSON and XML. You can also customize the returned danmu format, but must follow these specifications:
+
+Format 1:
+```javascript
+[
+  {
+    p: "",// Time, position, color, and other attributes
+    m: "",
+    cid: "",
+  }
+]
+```
+
+Format 2:
+```javascript
+[
+  [
+    0,// Time
+    "0",// Position
+    "#fff",// Color
+    "",
+    "Content" // Danmu content
+  ]
+]
+```
+
+#### Best Practices
+
+1. **Local Caching**: Use `Widget.storage` to cache danmu segment information, avoiding duplicate requests
+2. **Segment Loading**: Load danmu for corresponding time segments on-demand based on playback progress
+3. **Error Handling**: Handle network request failures and danmu parsing exceptions
+4. **Format Support**: Built-in support for XML and JSON formats, supports zlib compression
+5. **Performance Optimization**: Avoid loading all danmu at once, reduce memory usage
+
 ### Debugging
 
 The App has built-in module testing tools
@@ -226,3 +410,25 @@ The App has built-in module testing tools
 2. Check network requests and responses
 3. Verify DOM parsing results
 4. Test different parameter combinations
+
+### Module Encryption
+
+ForwardWidget supports optional encryption for JS modules. Encrypted modules are automatically decrypted on import. Unencrypted modules continue to work normally.
+
+#### Online Tool
+
+Visit the [Encryption Tool](https://forward.vvebo.vip/encrypt/) to encrypt in your browser.
+
+#### API
+
+```bash
+curl -X POST https://widgetencrypt.inchmade.ai --data-binary @widgets/tmdb.js -o widgets/tmdb.js
+```
+
+#### Claude Code
+
+When using Claude Code in this repo, use the built-in command:
+
+```
+/fw-encrypt widgets/tmdb.js
+```
