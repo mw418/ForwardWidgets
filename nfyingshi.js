@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.6.1",
+  version: "1.6.2",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -745,7 +745,7 @@ async function loadDetail(link) {
         var epNum = parseInt((epTitle.match(/\d+/) || [])[0]) || 0;
         var si = extractSeasonInfo(title);
         episodeItems.push({
-          id: epId, type: 'url', title: epTitle, coverUrl: poster, posterPath: poster, description: title + ' - ' + epTitle, season: si.seasonNumber, episode: epNum, playerType: 'system', link: epId,
+          id: epId, type: 'url', title: title + ' ' + epTitle, coverUrl: poster, posterPath: poster, description: title + ' - ' + epTitle, season: si.seasonNumber, episode: epNum, playerType: 'system', link: epId,
           videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + epVid + '.html'; trailerCover = poster; }
@@ -761,7 +761,7 @@ async function loadDetail(link) {
         var reNum = parseInt((re.title.match(/\d+/) || [])[0]) || 0;
         var rsi = extractSeasonInfo(title);
         episodeItems.push({
-          id: rId, type: 'url', title: re.title, coverUrl: poster, posterPath: poster, description: title + ' - ' + re.title, season: rsi.seasonNumber, episode: reNum, playerType: 'system', link: rId,
+          id: rId, type: 'url', title: title + ' ' + re.title, coverUrl: poster, posterPath: poster, description: title + ' - ' + re.title, season: rsi.seasonNumber, episode: reNum, playerType: 'system', link: rId,
           videoUrl: siteUrl + '/v_play/' + re.vid + '.html',
         });
         if (!trailerUrl) { trailerUrl = siteUrl + '/v_play/' + re.vid + '.html'; trailerCover = poster; }
@@ -814,7 +814,7 @@ async function loadDetail(link) {
                 title: info.names[q] || ('画质' + (q + 1)),
                 coverUrl: poster, posterPath: poster, videoUrl: info.urls[q],
                 link: ep.id + ':q' + q, playerType: 'system',
-                description: info.names[q] || ('画质' + (q + 1)),
+                description: title + ' - ' + ep.title + ' - ' + (info.names[q] || ('画质' + (q + 1))),
               });
             }
           }
