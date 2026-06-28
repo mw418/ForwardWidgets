@@ -483,11 +483,21 @@ async function loadResource(params) {
     var resources = [];
     for (var i = 0; i < detail.episodeItems.length; i++) {
       var ep = detail.episodeItems[i];
-      resources.push({
-        name: 'nfyingshi',
-        description: detail.title + ' - ' + ep.title,
-        url: ep.videoUrl || '',
-      });
+      if (ep.qualityUrls && ep.qualityUrls.length > 1) {
+        for (var q = 0; q < ep.qualityUrls.length; q++) {
+          resources.push({
+            name: 'nfyingshi',
+            description: detail.title + ' - ' + ep.title + ' - ' + (ep.qualityNames[q] || '画质' + (q + 1)),
+            url: ep.qualityUrls[q],
+          });
+        }
+      } else {
+        resources.push({
+          name: 'nfyingshi',
+          description: detail.title + ' - ' + ep.title,
+          url: ep.videoUrl || '',
+        });
+      }
     }
     return resources;
   } catch (e) {
