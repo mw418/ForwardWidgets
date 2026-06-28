@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.2.7",
+  version: "1.3.0",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -396,24 +396,20 @@ function toCNSeason(n) {
   return s;
 }
 
-function extractBaseName(name) {
-  // "第X季"/"第X部" with optional spaces
-  var m = name.match(/第\s*([一二三四五六七八九十\d]+)\s*[季部]/);
+function extractSeasonInfo(seriesName) {
+  if (!seriesName) return { baseName: seriesName, seasonNumber: 1 };
+  // "第X季"/"第X部"
+  var m = seriesName.match(/第\s*([一二三四五六七八九十\d]+)\s*[季部]/);
   if (m) {
     var num = CN_NUM[m[1]] || parseInt(m[1]) || 1;
-    return { baseName: name.replace(/第\s*[一二三四五六七八九十\d]+\s*[季部]/, '').trim(), season: num };
+    return { baseName: seriesName.replace(/第\s*[一二三四五六七八九十\d]+\s*[季部]/, '').trim(), seasonNumber: num };
   }
-  // "黑袍纠察队4", "黑袍纠察队 4" — number at end, 1-2 digits
-  m = name.match(/^(.+?)\s*(\d{1,2})\s*$/);
+  // "黑袍纠察队4", "黑袍纠察队 4" — trailing digits
+  m = seriesName.match(/^(.+?)\s*(\d{1,2})\s*$/);
   if (m) {
-    return { baseName: m[1].trim(), season: parseInt(m[2]) };
+    return { baseName: m[1].trim(), seasonNumber: parseInt(m[2]) || 1 };
   }
-  // "Season X"
-  m = name.match(/^(.+?)\s*[Ss]eason\s*(\d+)\s*$/);
-  if (m) {
-    return { baseName: m[1].trim(), season: parseInt(m[2]) };
-  }
-  return { baseName: name.trim(), season: null };
+  return { baseName: seriesName.trim(), seasonNumber: 1 };
 }
 
 async function loadResource(params) {
@@ -424,9 +420,10 @@ async function loadResource(params) {
     if (!seriesName) return [];
 
     var siteUrl = getSiteUrl(params);
-    var _b = extractBaseName(seriesName);
+    var isMovie = params.type === 'movie';
+    var _b = extractSeasonInfo(seriesName);
     var baseName = _b.baseName;
-    var targetSeason = season ? parseInt(season) : (_b.season || null);
+    var targetSeason = isMovie ? null : (season ? parseInt(season) : _b.seasonNumber);
 
     // Search with base name only (don't confuse search engine with season suffix)
     var searchQuery = baseName;
@@ -434,6 +431,20 @@ async function loadResource(params) {
     var res = await Widget.http.get(url, { headers: buildHeaders() });
     var $ = Widget.html.load(res.data);
     var cards = parseSearchCards($, siteUrl);
+
+    // Fallback: homepage parsing (site search often returns None Related)
+    if (!cards.length) {
+      res = await Widget.http.get(siteUrl, { headers: buildHeaders() });
+      $ = Widget.html.load(res.data);
+      cards = parseMovieCards($, siteUrl);
+      if (cards.length) {
+        var filtered = [];
+        for (var ci = 0; ci < cards.length; ci++) {
+          if (cards[ci].title.indexOf(baseName) !== -1) filtered.push(cards[ci]);
+        }
+        if (filtered.length) cards = filtered;
+      }
+    }
     if (!cards.length) return [];
 
     // Match best card by season
@@ -441,7 +452,7 @@ async function loadResource(params) {
     if (targetSeason && cards.length > 1) {
       // Prefer exact season match
       for (var ci = 0; ci < cards.length; ci++) {
-        var si = extractBaseName(cards[ci].title);
+        var si = extractSeasonInfo(cards[ci].title);
         if (si.season === targetSeason) { best = cards[ci]; break; }
       }
     }
@@ -451,11 +462,12 @@ async function loadResource(params) {
     var resources = [];
     for (var i = 0; i < detail.episodeItems.length; i++) {
       var ep = detail.episodeItems[i];
-      // If episode filter is set, skip non-matching
-      if (episode) {
-        var epNum = parseInt((ep.title.match(/\d+/) || [])[0]);
-        if (epNum && epNum !== parseInt(episode)) continue;
-      }
+      // Extract episode number for _ep tagging (like VodStream)
+      var epMatch = ep.title.match(/第\s*([一二三四五六七八九十\d]+)\s*集?/);
+      if (!epMatch) epMatch = ep.title.match(/(\d+)/);
+      var epNum = epMatch ? (CN_NUM[epMatch[1]] || parseInt(epMatch[1]) || null) : null;
+      // TV: filter by episode if specified (like VodStream)
+      if (!isMovie && episode && epNum && epNum !== parseInt(episode)) continue;
       if (ep.childItems && ep.childItems.length > 0) {
         for (var q = 0; q < ep.childItems.length; q++) {
           var child = ep.childItems[q];
@@ -463,6 +475,7 @@ async function loadResource(params) {
             name: 'nfyingshi',
             description: detail.title + ' - ' + ep.title + ' - ' + child.title,
             url: child.videoUrl || '',
+            _ep: isMovie ? null : epNum,  // VodStream-style _ep marker
           });
         }
       } else {
@@ -470,6 +483,7 @@ async function loadResource(params) {
           name: 'nfyingshi',
           description: detail.title + ' - ' + ep.title,
           url: ep.videoUrl || '',
+          _ep: isMovie ? null : epNum,
         });
       }
     }
@@ -580,6 +594,35 @@ async function loadCategory(params) {
   }
 }
 
+
+// Parse search result cards (article-based, fallback to bt_img li)
+function parseSearchCards($, siteUrl) {
+  var items = [];
+  $("article.searart").each(function () {
+    var $art = $(this);
+    if ($art.find("h1").length) return;
+    var $img = $art.find("img.thumb, img.lazy");
+    var poster = $img.attr("data-original") || $img.attr("src") || "";
+    if (poster && !poster.includes("blank.gif") && poster.startsWith("/")) poster = siteUrl + poster;
+    var $a = $art.find(".entry-title a, h3 a, a[href*=\"/movie/\"]").first();
+    var title = $a.text().trim();
+    var href = $a.attr("href") || "";
+    var idMatch = href.match(/\/movie\/(\d+)\.html/);
+    var postId = idMatch ? idMatch[1] : "";
+    var $rating = $art.find(".rating, .star");
+    var rating = $rating.length ? parseFloat($rating.first().text().trim()) || undefined : undefined;
+    if (title && postId) {
+      items.push({
+        id: "nf:" + postId, type: "url", title: title,
+        posterPath: poster, link: "nf:" + postId,
+        rating: rating, postId: postId,
+      });
+    }
+  });
+  if (!items.length) return parseMovieCards($, siteUrl);
+  return items;
+}
+
 // ── Handler: Search ────────────────────────────────────
 
 async function search(params) {
@@ -592,7 +635,7 @@ async function search(params) {
     if (page > 1) url += '&paged=' + page;
     var res = await Widget.http.get(url, { headers: buildHeaders(params) });
     var $ = Widget.html.load(res.data);
-    var items = parseMovieCards($, siteUrl);
+    var items = parseSearchCards($, siteUrl);
     return items;
   } catch (e) {
     console.error('[nfyingshi:search]', e.message || e);
@@ -610,9 +653,7 @@ async function loadDetail(link) {
 
     var siteUrl = 'https://www.nfyingshi.com';
     var res = await Widget.http.get(siteUrl + '/movie/' + postId + '.html', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-      },
+      headers: buildHeaders(),
     });
     var $ = Widget.html.load(res.data);
 
