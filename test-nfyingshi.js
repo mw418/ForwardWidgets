@@ -177,6 +177,8 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
 
   var source = await loadSource("nfep:9000:testvid:q1");
   check("指定画质link返回对应sourceUrl", () => assert.equal(source.sourceUrl, "https://cdn.example.com/720.m3u8"));
+  var directSource = await loadSource("https://cdn.example.com/direct.m3u8");
+  check("直接媒体URL可播放", () => assert.equal(directSource.sourceUrl, "https://cdn.example.com/direct.m3u8"));
 
   var multiSource = await loadSource("nfep:9000:testvid");
   check("未指定画质时返回多画质列表", () => assert.deepEqual(multiSource.sourceNames, ["1080P", "720P"]));
@@ -184,7 +186,9 @@ eval(fs.readFileSync("./nfyingshi.js", "utf8"));
   var qDetail = await loadDetail("nf:9000");
   check("详情标题不会变成集数", () => assert.equal(qDetail.title, "测试剧"));
   check("详情只展示真实剧集", () => assert.equal(qDetail.episodeItems.length, 2));
-  check("详情不把画质塞进childItems", () => assert.equal(qDetail.episodeItems[0].childItems, undefined));
+  check("详情展示全部画质子项", () => assert.deepEqual(qDetail.episodeItems[0].childItems.map(x => x.title), ["第一集 · 1080P", "第一集 · 720P"]));
+  check("详情父集默认播放使用直链", () => assert.equal(qDetail.episodeItems[0].videoUrl, "https://cdn.example.com/720.m3u8"));
+  check("详情画质子项可直接播放", () => assert.equal(qDetail.episodeItems[0].childItems[0].videoUrl, "https://cdn.example.com/1080.m3u8"));
   check("详情描述不写默认画质", () => assert.equal(qDetail.episodeItems[0].description.indexOf("默认"), -1));
 
   var oldParseSearchCards = parseSearchCards;

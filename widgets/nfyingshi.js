@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.9.1",
+  version: "1.9.2",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -218,6 +218,9 @@ function utf8Decode(bytes) {
 
 async function loadSource(link) {
   try {
+    if (/^https?:\/\/.+\.(m3u8|mp4)(?:\?|#|$)/i.test(String(link))) {
+      return { sourceUrl: String(link) };
+    }
     var parts = String(link).split(':');
     if (parts.length < 3 || parts[0] !== 'nfep') return null;
     var postId = parts[1];
@@ -520,12 +523,15 @@ async function loadEpisodeQualities(ep) {
       for (var i = 0; i < info.urls.length; i++) {
         list.push({ url: info.urls[i], name: info.names[i] || ('画质' + (i + 1)) });
       }
+      list.defaultIdx = info.defaultIdx || 0;
       return list;
     }
   } catch (e) {
     console.log('[nfyingshi:qualities] 解析失败:', e.message || e);
   }
-  return ep && ep.videoUrl ? [{ url: ep.videoUrl, name: '播放源' }] : [];
+  var fallback = ep && ep.videoUrl ? [{ url: ep.videoUrl, name: '播放源' }] : [];
+  fallback.defaultIdx = 0;
+  return fallback;
 }
 
 function extractSeasonInfo(seriesName) {
@@ -598,7 +604,17 @@ async function loadResource(params) {
       var epNum = ep.episode || extractEpisodeNumber(ep.title, i + 1);
       if (!isMovie && targetEpisode !== null && epNum !== targetEpisode) continue;
 
-      var qualities = await loadEpisodeQualities(ep);
+      var qualities = [];
+      if (ep.childItems && ep.childItems.length > 0) {
+        for (var cq = 0; cq < ep.childItems.length; cq++) {
+          qualities.push({
+            url: ep.childItems[cq].videoUrl,
+            name: ep.childItems[cq].qualityName || ep.childItems[cq].title,
+          });
+        }
+      } else {
+        qualities = await loadEpisodeQualities(ep);
+      }
       for (var q = 0; q < qualities.length; q++) {
         if (!qualities[q].url) continue;
         var item = {
@@ -861,6 +877,35 @@ async function loadDetail(link) {
       for (var ri = 0; ri < rawEps.length; ri++) {
         var re = rawEps[ri];
         pushEpisode(re.vid, re.title);
+      }
+    }
+
+    for (var qi = 0; qi < episodeItems.length; qi++) {
+      var ep = episodeItems[qi];
+      var qualities = await loadEpisodeQualities(ep);
+      if (!qualities.length) continue;
+      var defaultIdx = qualities.defaultIdx || 0;
+      if (defaultIdx < 0 || defaultIdx >= qualities.length) defaultIdx = 0;
+      var defaultQuality = qualities[defaultIdx] || qualities[0];
+      ep.videoUrl = defaultQuality.url;
+      ep.link = ep.id + ':q' + defaultIdx;
+      ep.playerType = 'system';
+      if (qualities.length > 1) {
+        ep.childItems = [];
+        for (var qq = 0; qq < qualities.length; qq++) {
+          ep.childItems.push({
+            id: ep.id + ':q' + qq,
+            type: 'url',
+            title: ep.title + ' · ' + qualities[qq].name,
+            qualityName: qualities[qq].name,
+            description: title + ' - ' + ep.title + ' - ' + qualities[qq].name,
+            season: ep.season,
+            episode: ep.episode,
+            link: ep.id + ':q' + qq,
+            videoUrl: qualities[qq].url,
+            playerType: 'system',
+          });
+        }
       }
     }
 
