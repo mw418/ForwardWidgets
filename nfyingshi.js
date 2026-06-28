@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.5.0",
+  version: "1.5.1",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -793,6 +793,31 @@ async function loadDetail(link) {
     if (yearEl.length) {
       var yearMatch = yearEl.text().match(/(\d{4})/);
       if (yearMatch) releaseDate = yearMatch[1] + '-01-01';
+    }
+
+    // Pre-resolve first episode only (for history playback), rest via sourceLoader
+    if (episodeItems.length > 0) {
+      var firstEp = episodeItems[0];
+      try {
+        var playRes = await Widget.http.get(firstEp.videoUrl, { headers: buildHeaders() });
+        var info = extractVideoInfo(playRes.data);
+        if (info && info.urls.length > 0) {
+          firstEp.videoUrl = info.urls[info.defaultIdx] || info.urls[0];
+          firstEp.childItems = [];
+          for (var q = 0; q < info.urls.length; q++) {
+            firstEp.childItems.push({
+              id: firstEp.id + ':q' + q,
+              type: 'url',
+              title: info.names[q] || ('画质' + (q + 1)),
+              posterPath: poster,
+              videoUrl: info.urls[q],
+              link: firstEp.id + ':q' + q,
+              description: info.names[q] || ('画质' + (q + 1)),
+            });
+          }
+          // Keep default videoUrl for history playback, childItems for quality options
+        }
+      } catch (e) { /* keep play-page URL */ }
     }
 
     return {
