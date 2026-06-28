@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "forward.nfyingshi",
   title: "奈菲影视",
-  version: "1.3.9",
+  version: "1.4.0",
   requiredVersion: "0.0.1",
   description: "奈菲影视(https://www.nfyingshi.com) 美剧/韩剧/电影资源",
   author: "mw99",
@@ -250,10 +250,6 @@ function base64Encode(str) {
   return result;
 }
 
-function playPagePath(postId, episode) {
-  return base64Encode('mv_' + postId + '-nm_' + episode);
-}
-
 // ── Login & Auth helpers ────────────────────────────────────
 
 var LOGIN_CACHE_KEY = '__nfy_login';
@@ -384,18 +380,6 @@ function parseMovieCards($, siteUrl) {
 
 // Chinese number to digit for season matching
 var CN_NUM = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
-var NUM_CN = { 1:'一',2:'二',3:'三',4:'四',5:'五',6:'六',7:'七',8:'八',9:'九',10:'十' };
-
-function toCNSeason(n) {
-  if (n <= 10) return NUM_CN[n] || String(n);
-  var s = '';
-  if (n >= 20) s += NUM_CN[Math.floor(n/10)] + '十';
-  else if (n >= 10) s += '十';
-  var r = n % 10;
-  if (r > 0) s += NUM_CN[r];
-  return s;
-}
-
 function extractSeasonInfo(seriesName) {
   if (!seriesName) return { baseName: seriesName, seasonNumber: 1 };
   // "第X季"/"第X部"
@@ -499,7 +483,7 @@ async function loadHot(params) {
   try {
     await performAuth(params);
     var siteUrl = getSiteUrl(params);
-    var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders(params) });
+    var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders() });
     var $ = Widget.html.load(res.data);
     var items = parseMovieCards($, siteUrl);
     return items.slice(0, 12);
@@ -515,7 +499,7 @@ async function loadRecent(params) {
   try {
     await performAuth(params);
     var siteUrl = getSiteUrl(params);
-    var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders(params) });
+    var res = await Widget.http.get(siteUrl + '/', { headers: buildHeaders() });
     var $ = Widget.html.load(res.data);
     var sections = $('.mi_btcon');
     if (sections.length < 2) return loadHot(params);
@@ -584,7 +568,7 @@ async function loadCategory(params) {
     var page = params.page || 1;
     var url = siteUrl + path;
     if (page > 1) url += '/page/' + page;
-    var res = await Widget.http.get(url, { headers: buildHeaders(params) });
+    var res = await Widget.http.get(url, { headers: buildHeaders() });
     var $ = Widget.html.load(res.data);
     var items = parseMovieCards($, siteUrl);
     return items;
@@ -633,7 +617,7 @@ async function search(params) {
     var page = params.page || 1;
     var url = siteUrl + '/?s=' + encodeURIComponent(keyword);
     if (page > 1) url += '&paged=' + page;
-    var res = await Widget.http.get(url, { headers: buildHeaders(params) });
+    var res = await Widget.http.get(url, { headers: buildHeaders() });
     var $ = Widget.html.load(res.data);
     var items = parseSearchCards($, siteUrl);
     return items;
@@ -651,7 +635,7 @@ async function loadDetail(link) {
     var postId = parts[1];
     if (!postId) return null;
 
-    var siteUrl = 'https://www.nfyingshi.com';
+    var siteUrl = 'https://www.nfyingshi.com'; // use default (no params in loadDetail)
     var res = await Widget.http.get(siteUrl + '/movie/' + postId + '.html', {
       headers: buildHeaders(),
     });
