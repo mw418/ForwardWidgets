@@ -62,6 +62,7 @@ WidgetMetadata = {
       { name: "page", title: "页码", type: "page" },
     ],
   },
+  },
   sourceLoader: {
     title: "解析播放源",
     functionName: "loadSource",
@@ -258,7 +259,13 @@ async function loadSource(link) {
     if (!info || !info.urls.length) return null;
 
     if (info.urls.length === 1) {
-      return { sourceUrl: info.urls[0] };
+      return { sourceUrl: info.urls[0]   },
+  sourceLoader: {
+    title: "解析播放源",
+    functionName: "loadSource",
+    params: [],
+  },
+};
     }
 
     // Multiple qualities: return all so player shows quality selector
@@ -266,7 +273,13 @@ async function loadSource(link) {
       sourceUrls: info.urls,
       sourceNames: info.names,
       defaultSourceUrl: info.urls[info.defaultIdx] || info.urls[0],
-    };
+      },
+  sourceLoader: {
+    title: "解析播放源",
+    functionName: "loadSource",
+    params: [],
+  },
+};
   } catch (e) {
     console.error('[nfyingshi:loadSource]', e.message || e);
     return null;
@@ -300,7 +313,13 @@ function extractVideoInfo(html) {
   var defaultMatch = decStr.match(/defaultQuality:\s*(\d+)/);
   if (defaultMatch) defaultIdx = parseInt(defaultMatch[1]) || 0;
 
-  return { urls: urls, names: names, defaultIdx: defaultIdx };
+  return { urls: urls, names: names, defaultIdx: defaultIdx   },
+  sourceLoader: {
+    title: "解析播放源",
+    functionName: "loadSource",
+    params: [],
+  },
+};
 }
 
 // ── Base64 encode (for play page URLs) ────────────────────────────────────
@@ -401,7 +420,13 @@ async function performAuth(params) {
 function buildHeaders() {
   var headers = {
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-  };
+    },
+  sourceLoader: {
+    title: "解析播放源",
+    functionName: "loadSource",
+    params: [],
+  },
+};
 
   // Check cached login cookie
   var cached = Widget.storage.get(LOGIN_CACHE_KEY);
@@ -534,6 +559,12 @@ var CATEGORY_URLS = {
   'juqing': '/movie_bt_tags/juqing',
   'fanzui': '/movie_bt_tags/fanzui',
   'donghua': '/movie_bt_tags/donghua',
+  },
+  sourceLoader: {
+    title: "解析播放源",
+    functionName: "loadSource",
+    params: [],
+  },
 };
 
 async function loadCategory(params) {
@@ -641,7 +672,6 @@ async function loadDetail(link) {
           type: 'url',
           title: epTitle,
           link: epId,
-          videoUrl: siteUrl + '/v_play/' + epVid + '.html',
         });
         if (!trailerUrl) {
           trailerUrl = siteUrl + '/v_play/' + epVid + '.html';
@@ -695,7 +725,13 @@ async function loadDetail(link) {
       releaseDate: releaseDate,
       link: 'nf:' + postId,
       trailers: trailerUrl ? [{ coverUrl: trailerCover, url: trailerUrl }] : [],
-    };
+      },
+  sourceLoader: {
+    title: "解析播放源",
+    functionName: "loadSource",
+    params: [],
+  },
+};
   } catch (e) {
     console.error('[nfyingshi:loadDetail]', e.message || e);
     return null;
